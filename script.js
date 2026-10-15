@@ -1,2177 +1,793 @@
-const canvas = document.getElementById("gameCanvas");
+const canvas = document.getElementById('gameCanvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-const overlay = document.getElementById("overlay");
-const startBtn = document.getElementById("startBtn");
-const healthBar = document.getElementById("healthBar");
-const healthValue = document.getElementById("healthValue");
-const specialBar = document.getElementById("specialBar");
-const comboValue = document.getElementById("comboValue");
-const blockValue = document.getElementById("blockValue");
-const dodgeValue = document.getElementById("dodgeValue");
-const levelValue = document.getElementById("levelValue");
-const coinValue = document.getElementById("coinValue");
-const enemyValue = document.getElementById("enemyValue");
-const coinHud = document.getElementById("coinHud");
-const bossBar = document.getElementById("bossBar");
-const bossName = document.getElementById("bossName");
-const bossHealth = document.getElementById("bossHealth");
-const actionMessage = document.getElementById("actionMessage");
-const soundBtn = document.getElementById("soundBtn");
-const ammoValue = document.getElementById("ammoValue");
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9ec9dc);
+scene.fog = new THREE.Fog(0xa8d1e6, 18, 170);
 
-const shopOverlay = document.getElementById("shopOverlay");
-const shopButton = document.getElementById("shopButton");
-const closeShop = document.getElementById("closeShop");
-const shopCoins = document.getElementById("shopCoins");
+const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 400);
+const clock = new THREE.Clock();
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2(0, 0);
+const keys = {};
+const joystick = { x: 0, y: 0 };
 
-// Phase 11: Daily Rewards + Achievements
-const rewardPopup = document.getElementById("rewardPopup");
-const rewardTitle = document.getElementById("rewardTitle");
-const rewardText = document.getElementById("rewardText");
-const claimReward = document.getElementById("claimReward");
-const achievementPopup = document.getElementById("achievementPopup");
-const achievementText = document.getElementById("achievementText");
-
-// Phase 12: Leaderboard
-const leaderboardButton = document.getElementById("leaderboardButton");
-const leaderboardOverlay = document.getElementById("leaderboardOverlay");
-const closeLeaderboard = document.getElementById("closeLeaderboard");
-const leaderboardList = document.getElementById("leaderboardList");
-
-// Phase 20: Loading + Settings
-const loadingScreen = document.getElementById("loadingScreen");
-const loadingFill = document.getElementById("loadingFill");
-const loadingText = document.getElementById("loadingText");
-const settingsButton = document.getElementById("settingsButton");
-const settingsOverlay = document.getElementById("settingsOverlay");
-const closeSettings = document.getElementById("closeSettings");
-const musicToggle = document.getElementById("musicToggle");
-const sfxToggle = document.getElementById("sfxToggle");
-const sensitivity = document.getElementById("sensitivity");
-const fullscreenButton = document.getElementById("fullscreenButton");
-const zoneStatus = document.getElementById("zoneStatus");
-
-const WORLD = { width: 4000, height: 3000 };
-const SAFE_ZONE = {
-  initialRadius: 1650,
-  finalRadius: 260,
-  delay: 25,
-  shrinkDuration: 70,
-  damage: 8
+const world = {
+  colliders: [],
+  enemies: [],
+  loot: [],
+  safeRadius: 90,
+  minRadius: 22,
+  time: 0,
+  zoneTimer: 0,
+  particles: [],
+  hostileShots: []
 };
-const keys = new Set();
-const player2Keys = new Set();
 
 const player = {
-  x: WORLD.width / 2,
-  y: WORLD.height / 2,
-  radius: 20,
-  speed: 260,
-  health: 100,
-  maxHealth: 100,
-  coins: 0,
-  level: 1,
-  angle: 0,
-  combo: 0,
-  comboTimer: 0,
-  attackCooldown: 0,
-  attackType: null,
-  attackTime: 0,
-  blockTime: 0,
-  blockCooldown: 0,
-  dodgeTime: 0,
-  dodgeCooldown: 0,
-  specialEnergy: 0,
-  invincible: 0,
-  damage: 18,
-  weapons: {
-    pistol: { ammo: 12, reserve: 48, unlocked: true },
-    rifle: { ammo: 0, reserve: 0, unlocked: false },
-    shotgun: { ammo: 0, reserve: 0, unlocked: false },
-    sniper: { ammo: 0, reserve: 0, unlocked: false }
-  },
-  activeWeapon: "pistol",
+  group: new THREE.Group(),
+  pos: new THREE.Vector3(0, 0, 16),
+  yaw: 0,
+  cameraYaw: 0,
+  pitch: 0.4,
+  hp: 100,
+  maxHp: 100,
+  coins: 200,
+  radius: 0.9,
+  jumpVel: 0,
+  onGround: true,
+  speedBoost: 1,
+  weaponIndex: 1,
   fireCooldown: 0,
   reloadTime: 0,
-  pet: {
-    unlocked: true,
-    level: 1,
-    type: "dog",
-    x: WORLD.width / 2,
-    y: WORLD.height / 2,
-    healTimer: 30,
-    coinRange: 120
+  firing: false,
+  jumpRequested: false,
+  walkPhase: 0,
+  limbs: [],
+  kills: 0,
+  aiming: false,
+  weapons: [
+    { name: 'Pistol', ammo: 12, reserve: 48, mag: 12, damage: 18, range: 35, fireRate: 0.28, reload: 1.4 },
+    { name: 'Assault Rifle', ammo: 30, reserve: 90, mag: 30, damage: 12, range: 42, fireRate: 0.11, reload: 1.8 },
+    { name: 'Shotgun', ammo: 8, reserve: 24, mag: 8, damage: 10, range: 18, fireRate: 0.8, reload: 2.2 },
+    { name: 'Sniper', ammo: 5, reserve: 15, mag: 5, damage: 44, range: 80, fireRate: 1.2, reload: 2.5 }
+  ],
+  loot: { medkit: 1, ammo: 2, armor: 1, boost: 1, backpack: 1, rare: 0, epic: 0 }
+};
+
+const hud = {
+  ammo: document.getElementById('ammoValue'),
+  coins: document.getElementById('coinValue'),
+  health: document.getElementById('healthBarInner'),
+  enemyCount: document.getElementById('enemyValue'),
+  killCount: document.getElementById('killValue'),
+  weaponName: document.getElementById('weaponName'),
+  weaponSub: document.getElementById('weaponSub'),
+  zone: document.getElementById('zoneText'),
+  pickup: document.getElementById('pickupPrompt'),
+  inventory: document.getElementById('inventoryList'),
+  toggle: document.getElementById('inventoryToggle'),
+  close: document.getElementById('closeInventory'),
+  panel: document.getElementById('inventoryPanel'),
+  notification: document.getElementById('notification')
+};
+
+function clamp(v, min, max) { return Math.min(Math.max(v, min), max); }
+
+function showToast(text) {
+  hud.notification.textContent = text;
+  hud.notification.classList.add('show');
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => hud.notification.classList.remove('show'), 1400);
+}
+
+function uiUpdate() {
+  const w = player.weapons[player.weaponIndex];
+  hud.ammo.textContent = `${w.ammo} / ${w.reserve}`;
+  hud.coins.textContent = String(player.coins);
+  hud.weaponName.textContent = w.name;
+  hud.weaponSub.textContent = `${w.name.toUpperCase().slice(0, 2)} • ${w.mag}-round mag`;
+  hud.enemyCount.textContent = String(world.enemies.filter(e => e.alive).length);
+  hud.killCount.textContent = String(player.kills);
+  hud.zone.textContent = `Safe Zone: ${Math.round(world.safeRadius)}m`;
+  const pct = clamp(player.hp / player.maxHp, 0, 1);
+  hud.health.style.width = `${pct * 100}%`;
+  if (player.hp < 35) hud.health.style.background = 'linear-gradient(90deg, #ff6a6a, #ffc857)';
+  else if (player.hp < 70) hud.health.style.background = 'linear-gradient(90deg, #7fff9d, #ffd75d)';
+  else hud.health.style.background = 'linear-gradient(90deg, #7fff9d, #ffd75d 60%, #ff5f5f)';
+}
+
+function renderInventory() {
+  const items = [
+    ['Medkit', player.loot.medkit],
+    ['Ammo', player.loot.ammo],
+    ['Armor', player.loot.armor],
+    ['Boost', player.loot.boost],
+    ['Backpack', player.loot.backpack],
+    ['Rare', player.loot.rare],
+    ['Epic', player.loot.epic]
+  ];
+  hud.inventory.innerHTML = items.map(([n, c]) => `<div class="inv-slot"><span class="name">${n}</span><span class="count">${c}</span></div>`).join('');
+}
+
+function setInventoryVisible(v) { hud.panel.classList.toggle('visible', v); }
+
+function addLighting() {
+  scene.add(new THREE.HemisphereLight(0xdff7ff, 0x203420, 1.25));
+  const sun = new THREE.DirectionalLight(0xfff3d1, 1.4);
+  sun.position.set(30, 35, 20);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -80;
+  sun.shadow.camera.right = 80;
+  sun.shadow.camera.top = 80;
+  sun.shadow.camera.bottom = -80;
+  scene.add(sun);
+}
+
+function addBuilding(x, z, w, d, h, color = 0xe8dab0) {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(w, 0.4, d), new THREE.MeshStandardMaterial({ color: 0x5a4c42, roughness: 1 }));
+  base.position.y = 0.2;
+  g.add(base);
+  const walls = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color, roughness: 0.9 }));
+  walls.position.y = h / 2;
+  walls.castShadow = true;
+  walls.receiveShadow = true;
+  g.add(walls);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.6, 0.7, d + 0.6), new THREE.MeshStandardMaterial({ color: 0x9f7d5f, roughness: 0.8 }));
+  roof.position.y = h + 0.35;
+  g.add(roof);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(w * 0.24, h * 0.7, 0.22), new THREE.MeshStandardMaterial({ color: 0x674630 }));
+  door.position.set(0, h * 0.35, d / 2 + 0.12);
+  g.add(door);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  world.colliders.push({ x, z, w, d, h });
+}
+
+function createTree(x, z, s = 1) {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.26 * s, 0.34 * s, 2.3 * s, 8), new THREE.MeshStandardMaterial({ color: 0x7b5637, roughness: 1 }));
+  trunk.position.y = 1.15 * s;
+  trunk.castShadow = true;
+  g.add(trunk);
+  const leaves = new THREE.Mesh(new THREE.SphereGeometry(1.3 * s, 10, 10), new THREE.MeshStandardMaterial({ color: 0x2f8f52, roughness: 1 }));
+  leaves.position.y = 3 * s;
+  leaves.castShadow = true;
+  g.add(leaves);
+  g.position.set(x, 0, z);
+  scene.add(g);
+}
+
+function createRock(x, z, s = 1) {
+  const mesh = new THREE.Mesh(new THREE.DodecahedronGeometry(1.1 * s, 0), new THREE.MeshStandardMaterial({ color: 0x858a8f, roughness: 1 }));
+  mesh.position.set(x, 0.7 * s, z);
+  mesh.scale.set(1.4, 0.9, 1.2);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+}
+
+function addGround() {
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), new THREE.MeshStandardMaterial({ color: 0x6ea750, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  const roadMat = new THREE.MeshStandardMaterial({ color: 0x8b836c, roughness: 1 });
+  const roadA = new THREE.Mesh(new THREE.BoxGeometry(15, 0.05, 180), roadMat); roadA.position.y = 0.03; scene.add(roadA);
+  const roadB = new THREE.Mesh(new THREE.BoxGeometry(180, 0.05, 15), roadMat); roadB.position.y = 0.03; scene.add(roadB);
+
+  const ring = new THREE.Mesh(new THREE.RingGeometry(88, 90, 64), new THREE.MeshBasicMaterial({ color: 0x67ffc6, side: THREE.DoubleSide, transparent: true, opacity: 0.5 }));
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.05;
+  ring.visible = false;
+  world.zoneRing = ring;
+  scene.add(ring);
+}
+
+function addLabel(text, x, z) {
+  const c = document.createElement('canvas');
+  c.width = 320; c.height = 96;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = 'rgba(7, 18, 12, 0.8)'; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.strokeStyle = '#c7ffd9'; ctx.strokeRect(8, 8, c.width - 16, c.height - 16);
+  ctx.fillStyle = '#ecfff0'; ctx.font = 'bold 32px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, c.width / 2, c.height / 2 + 2);
+  const tex = new THREE.CanvasTexture(c);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  sprite.position.set(x, 2.5, z); sprite.scale.set(8, 2.4, 1);
+  scene.add(sprite);
+}
+
+function addLoot(type, x, z) {
+  const colors = { medkit: 0x63f0a0, ammo: 0xfad86f, armor: 0x89cbff, boost: 0xff9e7d, backpack: 0xb5d8ff, rare: 0xcf9bff, epic: 0xffcf6f };
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), new THREE.MeshStandardMaterial({ color: colors[type] || 0xffffff, emissive: colors[type] || 0x202020, emissiveIntensity: 0.2 }));
+  body.castShadow = true;
+  g.add(body);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.09, 8, 12), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.4 }));
+  ring.rotation.x = Math.PI / 2;
+  g.add(ring);
+  g.position.set(x, 0.9, z);
+  scene.add(g);
+  world.loot.push({ type, mesh: g, collected: false });
+}
+
+function collides(x, z, radius = 0.8) {
+  for (const b of world.colliders) {
+    const dx = Math.abs(x - b.x), dz = Math.abs(z - b.z);
+    if (dx < b.w / 2 + radius && dz < b.d / 2 + radius) return true;
   }
-};
+  return x < -110 || x > 110 || z < -110 || z > 110;
+}
 
-// Phase 16: Player 2
-const player2 = {
-  x: WORLD.width / 2 - 100,
-  y: WORLD.height / 2,
-  radius: 20,
-  speed: 260,
-  health: 100,
-  maxHealth: 100,
-  coins: 0,
-  level: 1,
-  angle: 0,
-  combo: 0,
-  comboTimer: 0,
-  attackCooldown: 0,
-  attackType: null,
-  attackTime: 0,
-  blockTime: 0,
-  blockCooldown: 0,
-  dodgeTime: 0,
-  dodgeCooldown: 0,
-  specialEnergy: 0,
-  invincible: 0,
-  damage: 18,
-  activeWeapon: "pistol",
-  fireCooldown: 0,
-  reloadTime: 0,
-  weapons: {
-    pistol: { ammo: 12, reserve: 48, unlocked: true }
-  }
-};
+function buildWorld() {
+  addGround(); addLighting();
+  const buildings = [
+    [-28, -24, 10, 9, 7, 0xe7d6af], [-44, 12, 12, 10, 8, 0xe3d7b7], [18, -22, 11, 9, 7, 0xe8d9b7], [40, 20, 14, 12, 9, 0xd8b98f], [-16, 34, 9, 8, 6, 0xe5d5a7], [22, 44, 11, 10, 8, 0xd3bd9b], [-58, 48, 16, 12, 10, 0xe4cfaf], [58, -50, 24, 16, 12, 0xcac0a2], [60, 52, 12, 10, 7, 0xdbc7a6], [-62, -54, 13, 11, 8, 0xd8c3a2]
+  ];
+  buildings.forEach(([x, z, w, d, h, c]) => addBuilding(x, z, w, d, h, c));
+  [
+    ['Ridge Point', -40, 65], ['Harbor Lane', 18, 64], ['The Village', -12, 0], ['Old Warehouse', 60, -42], ['North Gate', -58, 45], ['Dusty Crossroad', 0, -18], ['Stone Ridge', 42, 55], ['Market Row', -24, -48]
+  ].forEach(([name, x, z]) => addLabel(name, x, z));
+  for (let i = 0; i < 50; i++) { const x = (Math.random() - 0.5) * 180; const z = (Math.random() - 0.5) * 180; if (Math.hypot(x, z) > 24) createTree(x, z, 0.7 + Math.random() * 1.2); }
+  for (let i = 0; i < 20; i++) { const x = (Math.random() - 0.5) * 160; const z = (Math.random() - 0.5) * 160; if (Math.hypot(x, z) > 15) createRock(x, z, 0.7 + Math.random() * 1.5); }
+  for (let i = 0; i < 8; i++) { const x = (Math.random() - 0.5) * 160; const z = (Math.random() - 0.5) * 160; const hill = new THREE.Mesh(new THREE.SphereGeometry(9 + Math.random() * 12, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2.4), new THREE.MeshStandardMaterial({ color: 0x6d9d5c, roughness: 1 })); hill.position.set(x, 4 + Math.random() * 5, z); hill.scale.set(1, 0.6, 1); hill.castShadow = true; hill.receiveShadow = true; scene.add(hill); }
+  [['medkit', -22, 20], ['ammo', 22, 14], ['armor', 14, -30], ['boost', -42, 30], ['backpack', 40, 24], ['rare', -64, -20], ['epic', 54, 38], ['ammo', -8, 52], ['medkit', 64, -54], ['armor', -58, -60], ['boost', 18, 52], ['backpack', 8, -62]].forEach(([t, x, z]) => addLoot(t, x, z));
+}
 
-const state = {
-  running: false,
-  ended: false,
-  lastFrame: 0,
-  elapsed: 0,
-  enemies: [],
-  coins: [],
-  particles: [],
-  boss: null,
-  enemiesToSpawn: 0,
-  spawnTimer: 0,
-  muted: false,
-  audio: null,
-  shake: 0,
-  slowMotion: 0,
-  message: "",
-  messageTimer: 0,
-  levelTransition: false,
-  weaponCrates: [],
-  powerups: [],
-  activePowerup: null,
-  powerupTimer: 0,
-  mobileFiring: false,
-  zone: null,
-  zoneDamageTimer: 0,
-  zoneWarningTimer: 0
-};
+function createPlayer() {
+  const model = createHumanoidModel(player.group, 0x315c48);
+  player.limbs = model.limbs;
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.8, 16), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.18 }));
+  shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.02; player.group.add(shadow);
+  player.group.position.copy(player.pos);
+  scene.add(player.group);
+}
 
-const shopPrices = {
-  health: 100,
-  damage: 150,
-  speed: 120,
-  special: 200
-};
-
-const upgrades = {
-  health: 0,
-  damage: 0,
-  speed: 0,
-  special: 0
-};
-
-const WEAPONS = {
-  pistol: { name: "PISTOL", damage: 22, fireRate: .35, range: 420, magazine: 12, reloadTime: 1.1, spread: .04, pellets: 1 },
-  rifle: { name: "RIFLE", damage: 18, fireRate: .14, range: 620, magazine: 30, reloadTime: 1.6, spread: .05, pellets: 1 },
-  shotgun: { name: "SHOTGUN", damage: 14, fireRate: .8, range: 220, magazine: 6, reloadTime: 1.9, spread: .22, pellets: 6 },
-  sniper: { name: "SNIPER", damage: 95, fireRate: 1.4, range: 900, magazine: 5, reloadTime: 2.4, spread: .01, pellets: 1 }
-};
-
-// Phase 11: Daily Rewards + Achievements
-const DAILY_REWARDS = [50, 100, 200, 300, 500, 750, 1000];
-
-const ACHIEVEMENTS = {
-  firstBlood: { name: "FIRST BLOOD", desc: "Pehla enemy maaro" },
-  bossSlayer: { name: "BOSS SLAYER", desc: "Pehla boss harao" },
-  coinCollector: { name: "COIN COLLECTOR", desc: "500 coins collect karo" },
-  petMaster: { name: "PET MASTER", desc: "Pet level 5 karo" },
-  survivor: { name: "SURVIVOR", desc: "10 levels clear karo" },
-  gunCollector: { name: "GUN COLLECTOR", desc: "Saare 4 guns unlock karo" }
-};
-
-function loadProgress() {
-  const saved = localStorage.getItem("shubhamJiProgress");
-  return saved ? JSON.parse(saved) : {
-    streak: 0,
-    lastClaim: null,
-    achievements: []
+function createRifle(parent, x, y, z) {
+  const gun = new THREE.Group();
+  const metal = new THREE.MeshStandardMaterial({ color: 0x202a2b, metalness: 0.72, roughness: 0.38 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x151a19, roughness: 0.78 });
+  const polymer = new THREE.MeshStandardMaterial({ color: 0x514a36, roughness: 0.86 });
+  const addBox = (width, height, depth, material, px, py, pz) => {
+    const part = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+    part.position.set(px, py, pz);
+    part.castShadow = true;
+    gun.add(part);
+    return part;
   };
+
+  addBox(0.2, 0.2, 0.48, metal, 0, 0, 0);
+  addBox(0.24, 0.11, 0.26, dark, 0, 0.13, 0.04);
+  addBox(0.18, 0.16, 0.3, polymer, 0, 0, -0.36);
+  addBox(0.17, 0.29, 0.13, dark, 0, -0.2, 0.02);
+  addBox(0.12, 0.2, 0.14, polymer, 0, -0.18, -0.08);
+  addBox(0.16, 0.14, 0.44, polymer, 0, 0, 0.43);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.54, 10), metal);
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.set(0, 0.01, 0.77);
+  barrel.castShadow = true;
+  gun.add(barrel);
+  const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.13, 10), dark);
+  muzzle.rotation.x = Math.PI / 2;
+  muzzle.position.set(0, 0.01, 1.09);
+  gun.add(muzzle);
+  addBox(0.1, 0.17, 0.14, dark, 0, 0.18, 0.02);
+  addBox(0.23, 0.045, 0.18, metal, 0, 0.28, 0.02);
+  gun.position.set(x, y, z);
+  parent.add(gun);
+  return gun;
 }
 
-function saveProgress(progress) {
-  localStorage.setItem("shubhamJiProgress", JSON.stringify(progress));
-}
-
-function checkDailyReward() {
-  const progress = loadProgress();
-  const today = new Date().toDateString();
-
-  if (progress.lastClaim === today) return;
-
-  const yesterday = new Date(Date.now() - 86400000).toDateString();
-
-  progress.streak = progress.lastClaim === yesterday
-    ? progress.streak + 1
-    : 1;
-
-  if (progress.streak > 7) progress.streak = 7;
-
-  const reward = DAILY_REWARDS[progress.streak - 1];
-
-  rewardTitle.textContent = `DAY ${progress.streak}`;
-  rewardText.textContent = `+${reward} COINS`;
-  rewardPopup.classList.remove("hidden");
-
-  claimReward.onclick = () => {
-    player.coins += reward;
-    progress.lastClaim = today;
-    saveProgress(progress);
-    saveGame();
-    updateHud();
-    rewardPopup.classList.add("hidden");
-    showMessage(`+${reward} COINS CLAIMED!`, 1.5);
-    playSound(700, .15);
+function createHumanoidModel(parent, uniformColor) {
+  const uniform = new THREE.MeshStandardMaterial({ color: uniformColor, roughness: 0.82 });
+  const vest = new THREE.MeshStandardMaterial({ color: 0x4b5143, roughness: 0.92 });
+  const skin = new THREE.MeshStandardMaterial({ color: 0xb98262, roughness: 0.95 });
+  const helmet = new THREE.MeshStandardMaterial({ color: 0x343e35, roughness: 0.78 });
+  const limbs = [];
+  const addMesh = (geometry, material, x, y, z) => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
   };
-}
 
-function unlockAchievement(key) {
-  const progress = loadProgress();
+  addMesh(new THREE.CapsuleGeometry(0.38, 0.75, 6, 12), uniform, 0, 1.52, 0);
+  addMesh(new THREE.BoxGeometry(0.67, 0.62, 0.34), vest, 0, 1.58, 0.13);
+  addMesh(new THREE.BoxGeometry(0.19, 0.31, 0.08), darkenMaterial(vest.color, 0.18), 0, 1.42, 0.32);
+  addMesh(new THREE.SphereGeometry(0.28, 12, 10), skin, 0, 2.27, 0.02);
+  addMesh(new THREE.SphereGeometry(0.3, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.58), helmet, 0, 2.42, -0.015);
+  addMesh(new THREE.BoxGeometry(0.55, 0.09, 0.36), helmet, 0, 2.35, 0.07);
 
-  if (progress.achievements.includes(key)) return;
+  for (const side of [-1, 1]) {
+    const arm = new THREE.Group();
+    arm.position.set(side * 0.43, 1.88, 0.1);
+    const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.14, 0.4, 5, 8), uniform);
+    upper.position.y = -0.28;
+    const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.115, 0.35, 5, 8), vest);
+    forearm.position.set(0, -0.61, 0.13);
+    arm.add(upper, forearm);
+    arm.traverse(part => { if (part.isMesh) part.castShadow = true; });
+    parent.add(arm);
+    limbs.push(arm);
 
-  progress.achievements.push(key);
-  saveProgress(progress);
-
-  achievementText.textContent =
-    `ACHIEVEMENT UNLOCKED — ${ACHIEVEMENTS[key].name}!`;
-
-  achievementPopup.classList.remove("hidden");
-
-  setTimeout(() => {
-    achievementPopup.classList.add("hidden");
-  }, 2500);
-
-  playSound(800, .2);
-}
-
-function checkAchievements() {
-  if (player.coins >= 500) {
-    unlockAchievement("coinCollector");
+    const leg = new THREE.Group();
+    leg.position.set(side * 0.2, 0.9, 0);
+    const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.52, 5, 8), uniform);
+    thigh.position.y = -0.32;
+    const boot = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.42), darkenMaterial(uniform.color, 0.42));
+    boot.position.set(0, -0.71, 0.08);
+    leg.add(thigh, boot);
+    leg.traverse(part => { if (part.isMesh) part.castShadow = true; });
+    parent.add(leg);
+    limbs.push(leg);
   }
 
-  if (player.pet.level >= 5) {
-    unlockAchievement("petMaster");
-  }
-
-  if (player.level >= 10) {
-    unlockAchievement("survivor");
-  }
-
-  const allGuns = Object.values(player.weapons).every(w => w.unlocked);
-
-  if (allGuns) {
-    unlockAchievement("gunCollector");
-  }
+  createRifle(parent, 0.25, 1.65, 0.31);
+  return { limbs };
 }
 
-// Phase 12: Leaderboard
-function getLeaderboard() {
-  const saved = localStorage.getItem("shubhamJiLeaderboard");
-  return saved ? JSON.parse(saved) : [];
+function darkenMaterial(color, amount) {
+  return new THREE.MeshStandardMaterial({ color: color.clone().multiplyScalar(1 - amount), roughness: 0.86 });
 }
 
-function saveLeaderboardEntry() {
-  const board = getLeaderboard();
-
-  board.push({
-    level: player.level,
-    coins: player.coins,
-    date: new Date().toLocaleDateString()
-  });
-
-  board.sort((a, b) =>
-    (b.level * 1000 + b.coins) - (a.level * 1000 + a.coins)
-  );
-
-  localStorage.setItem(
-    "shubhamJiLeaderboard",
-    JSON.stringify(board.slice(0, 5))
-  );
+function createEnemy(x, z, color = 0x8bb76f) {
+  const g = new THREE.Group();
+  const model = createHumanoidModel(g, color);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.05), new THREE.MeshBasicMaterial({ color: 0x34ff7a }));
+  bar.position.set(0, 3.1, 0); g.add(bar);
+  g.position.set(x, 0, z); scene.add(g);
+  world.enemies.push({ group: g, limbs: model.limbs, health: 100, maxHealth: 100, alive: true, attackCooldown: 0.6 + Math.random(), speed: 2.1 + Math.random() * 0.8, healthBar: bar });
 }
 
-function renderLeaderboard() {
-  const board = getLeaderboard();
-
-  if (!leaderboardList) return;
-
-  if (board.length === 0) {
-    leaderboardList.innerHTML =
-      '<div class="leaderboard-empty">Abhi koi score nahi — game khelo!</div>';
-    return;
-  }
-
-  leaderboardList.innerHTML = board.map((entry, index) => `
-    <div class="leaderboard-row">
-      <span class="rank">#${index + 1}</span>
-      <span>LVL ${entry.level} · ${entry.coins} COINS</span>
-      <span class="score">${entry.level * 1000 + entry.coins}</span>
-    </div>
-  `).join("");
+function switchWeapon(index) {
+  if (index < 0 || index >= player.weapons.length) return;
+  player.weaponIndex = index; player.fireCooldown = 0; player.reloadTime = 0; uiUpdate();
 }
 
-if (leaderboardButton) {
-  leaderboardButton.addEventListener("click", () => {
-    renderLeaderboard();
-    leaderboardOverlay.classList.remove("hidden");
-  });
+function doReload() {
+  const w = player.weapons[player.weaponIndex];
+  if (w.ammo >= w.mag || w.reserve <= 0 || player.reloadTime > 0) return;
+  player.reloadTime = w.reload;
+  showToast(`Reloading ${w.name}`);
 }
 
-if (closeLeaderboard) {
-  closeLeaderboard.addEventListener("click", () => {
-    leaderboardOverlay.classList.add("hidden");
-  });
+function finishReload() {
+  const w = player.weapons[player.weaponIndex];
+  const need = w.mag - w.ammo;
+  const load = Math.min(need, w.reserve);
+  w.ammo += load; w.reserve -= load; uiUpdate();
 }
 
-// Phase 14: House Cover + River Slow
-const HOUSES = [];
-const RIVER = { x: 2000, y: 1500, width: 4000, height: 120 };
+function shoot() {
+  const w = player.weapons[player.weaponIndex];
+  if (player.reloadTime > 0 || player.fireCooldown > 0) return;
+  if (w.ammo <= 0) { doReload(); return; }
+  w.ammo -= 1; player.fireCooldown = w.fireRate; uiUpdate();
 
-function initCoverZones() {
-  for (let i = 0; i < 8; i++) {
-    HOUSES.push({
-      x: Math.random() * 3400 + 300,
-      y: Math.random() * 2400 + 300,
-      radius: 60
+  const shootPos = player.group.localToWorld(new THREE.Vector3(0.25, 1.65, 1.42));
+  const flash = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffd76d, transparent: true, opacity: 0.9 }));
+  flash.position.copy(shootPos); scene.add(flash); world.particles.push({ mesh: flash, life: 0.12, maxLife: 0.12 });
+
+  raycaster.setFromCamera(pointer, camera);
+  raycaster.far = w.range;
+  const targets = world.enemies.filter(e => e.alive).map(e => e.group);
+  const hits = raycaster.intersectObjects(targets, true);
+  let hitEnemy = null, hitPoint = null;
+  for (const hit of hits) {
+    const found = world.enemies.find(e => {
+      let node = hit.object;
+      while (node && node !== e.group) node = node.parent;
+      return node === e.group;
     });
-  }
-}
-
-function isNearHouse(x, y) {
-  return HOUSES.some(h =>
-    Math.hypot(x - h.x, y - h.y) < h.radius
-  );
-}
-
-function isInRiver(x, y) {
-  return (
-    Math.abs(y - RIVER.y) < RIVER.height / 2 &&
-    x > 0 && x < RIVER.width
-  );
-}
-
-initCoverZones();
-
-// Phase 18: Map Variety
-const BIOMES = {
-  jungle: { name: "JUNGLE" },
-  desert: { name: "DESERT" },
-  snow: { name: "SNOW" },
-  city: { name: "CITY" }
-};
-
-let currentBiome = "jungle";
-
-function getRandomBiome() {
-  const keys = Object.keys(BIOMES);
-  return keys[Math.floor(Math.random() * keys.length)];
-}
-
-// Phase 19: Power-ups
-const POWERUPS = {
-  speed: { name: "SPEED BOOST", color: "#4cc9f0", duration: 10 },
-  shield: { name: "SHIELD", color: "#7ee787", duration: 10 },
-  doubleDamage: { name: "DOUBLE DAMAGE", color: "#ff5a5a", duration: 10 }
-};
-
-function spawnPowerup() {
-  const types = Object.keys(POWERUPS);
-  const type = types[Math.floor(Math.random() * types.length)];
-
-  state.powerups.push({
-    x: Math.random() * WORLD.width,
-    y: Math.random() * WORLD.height,
-    type,
-    collected: false
-  });
-}
-
-function activatePowerup(type) {
-  state.activePowerup = type;
-  state.powerupTimer = POWERUPS[type].duration;
-
-  showMessage(`${POWERUPS[type].name} ACTIVATED!`, 1.5);
-  playSound(800, .2, "triangle");
-}
-
-function updatePowerups(dt) {
-  if (state.elapsed % 15 < dt && state.powerups.length < 3) {
-    spawnPowerup();
-  }
-
-  for (let i = state.powerups.length - 1; i >= 0; i--) {
-    const pu = state.powerups[i];
-    const distance = Math.hypot(player.x - pu.x, player.y - pu.y);
-
-    if (distance < 50 && !pu.collected) {
-      pu.collected = true;
-      state.powerups.splice(i, 1);
-      activatePowerup(pu.type);
-      createParticles(pu.x, pu.y, POWERUPS[pu.type].color, 20);
-    }
-  }
-
-  if (state.activePowerup) {
-    state.powerupTimer -= dt;
-
-    if (state.powerupTimer <= 0) {
-      showMessage(`${POWERUPS[state.activePowerup].name} ENDED`);
-      state.activePowerup = null;
-    }
-  }
-}
-
-function getPowerupSpeedMultiplier() {
-  return state.activePowerup === "speed" ? 1.6 : 1;
-}
-
-function getPowerupDamageMultiplier() {
-  return state.activePowerup === "doubleDamage" ? 2 : 1;
-}
-
-// Phase 15: Sound + Music
-let musicOscillators = [];
-let musicGain = null;
-let musicPlaying = false;
-let musicEnabled = true;
-let sfxEnabled = true;
-
-function startBackgroundMusic() {
-  if (musicPlaying || state.muted || !musicEnabled) return;
-
-  try {
-    state.audio ||= new AudioContext();
-
-    musicGain = state.audio.createGain();
-    musicGain.gain.value = .03;
-    musicGain.connect(state.audio.destination);
-
-    const notes = [220, 277, 330, 440, 330, 277];
-    let noteIndex = 0;
-
-    const playNote = () => {
-      if (!musicPlaying) return;
-
-      const osc = state.audio.createOscillator();
-      const gain = state.audio.createGain();
-
-      osc.type = "triangle";
-      osc.frequency.value = notes[noteIndex % notes.length];
-
-      gain.gain.setValueAtTime(.02, state.audio.currentTime);
-      gain.gain.exponentialRampToValueAtTime(.001, state.audio.currentTime + .4);
-
-      osc.connect(gain);
-      gain.connect(musicGain);
-
-      osc.start();
-      osc.stop(state.audio.currentTime + .4);
-
-      musicOscillators.push(osc);
-      noteIndex++;
-
-      setTimeout(playNote, 450);
-    };
-
-    musicPlaying = true;
-    playNote();
-  } catch (error) {
-    console.warn("Music error:", error);
-  }
-}
-
-function stopBackgroundMusic() {
-  musicPlaying = false;
-  musicOscillators = [];
-
-  if (musicGain) {
-    musicGain.disconnect();
-    musicGain = null;
-  }
-}
-
-function playHitSound() {
-  playSound(140, .12, "sawtooth");
-}
-
-function playVictoryJingle() {
-  const notes = [523, 659, 784, 1047];
-
-  notes.forEach((freq, i) => {
-    setTimeout(() => playSound(freq, .25, "triangle"), i * 180);
-  });
-}
-
-function playGunShotSound() {
-  playSound(180, .06, "square");
-  playSound(90, .1, "sawtooth");
-}
-
-function saveGame() {
-  localStorage.setItem("shubhamJiSave", JSON.stringify({
-    coins: player.coins,
-    level: player.level,
-    damage: player.damage,
-    maxHealth: player.maxHealth,
-    speed: player.speed,
-    activeWeapon: player.activeWeapon,
-    weapons: player.weapons,
-    pet: player.pet
-  }));
-}
-
-function loadGame() {
-  const save = localStorage.getItem("shubhamJiSave");
-  if (!save) return;
-
-  const data = JSON.parse(save);
-
-  player.coins = data.coins || 0;
-  player.level = data.level || 1;
-  player.damage = data.damage || 18;
-  player.maxHealth = data.maxHealth || 100;
-  player.speed = data.speed || 260;
-  player.health = player.maxHealth;
-
-  if (data.weapons) {
-    for (const key in player.weapons) {
-      if (data.weapons[key]) {
-        player.weapons[key] = data.weapons[key];
-      }
-    }
-  }
-
-  if (data.activeWeapon && player.weapons[data.activeWeapon]?.unlocked) {
-    player.activeWeapon = data.activeWeapon;
-  }
-
-  if (data.pet) {
-    player.pet = {
-      unlocked: data.pet.unlocked ?? true,
-      level: data.pet.level || 1,
-      type: data.pet.type || "dog",
-      x: player.x,
-      y: player.y,
-      healTimer: 30,
-      coinRange: 120 + (data.pet.level - 1) * 30
-    };
-  }
-}
-
-function saveUpgrades() {
-  localStorage.setItem("shubhamJiUpgrades", JSON.stringify(upgrades));
-}
-
-function loadUpgrades() {
-  const saved = localStorage.getItem("shubhamJiUpgrades");
-  if (!saved) return;
-
-  const data = JSON.parse(saved);
-
-  upgrades.health = data.health || 0;
-  upgrades.damage = data.damage || 0;
-  upgrades.speed = data.speed || 0;
-  upgrades.special = data.special || 0;
-
-  player.maxHealth = 100 + upgrades.health * 20;
-  player.damage = 18 + upgrades.damage * 4;
-  player.speed = 260 + upgrades.speed * 15;
-  player.health = player.maxHealth;
-}
-
-function showMessage(text, time = 1.2) {
-  state.message = text;
-  state.messageTimer = time;
-}
-
-function updateSafeZone(dt) {
-  if (!state.zone) return;
-
-  const zone = state.zone;
-  zone.elapsed += dt;
-
-  const shrinkProgress = Math.min(
-    1,
-    Math.max(0, (zone.elapsed - SAFE_ZONE.delay) / SAFE_ZONE.shrinkDuration)
-  );
-
-  zone.radius =
-    SAFE_ZONE.initialRadius -
-    (SAFE_ZONE.initialRadius - SAFE_ZONE.finalRadius) * shrinkProgress;
-
-  const secondsLeft = Math.ceil(
-    zone.elapsed < SAFE_ZONE.delay
-      ? SAFE_ZONE.delay - zone.elapsed
-      : SAFE_ZONE.shrinkDuration * (1 - shrinkProgress)
-  );
-
-  const status = zone.elapsed < SAFE_ZONE.delay
-    ? `SAFE ZONE · SHRINK IN ${secondsLeft}s`
-    : shrinkProgress < 1
-      ? `ZONE SHRINKING · ${secondsLeft}s`
-      : "FINAL ZONE";
-
-  if (zoneStatus.textContent !== status) {
-    zoneStatus.textContent = status;
-  }
-
-  const outsideZone =
-    Math.hypot(player.x - zone.x, player.y - zone.y) > zone.radius;
-
-  zoneStatus.classList.toggle("danger", outsideZone);
-
-  if (!outsideZone) {
-    state.zoneDamageTimer = 0;
-    state.zoneWarningTimer = 0;
-    return;
-  }
-
-  state.zoneDamageTimer -= dt;
-  state.zoneWarningTimer -= dt;
-
-  if (state.zoneWarningTimer <= 0) {
-    showMessage("OUTSIDE SAFE ZONE!");
-    state.zoneWarningTimer = 2.5;
-  }
-
-  if (state.zoneDamageTimer <= 0) {
-    damagePlayer(SAFE_ZONE.damage);
-    state.zoneDamageTimer = 1;
-  }
-}
-
-function playSound(frequency, duration = .08, type = "square") {
-  if (state.muted || !sfxEnabled) return;
-
-  try {
-    state.audio ||= new AudioContext();
-
-    const osc = state.audio.createOscillator();
-    const gain = state.audio.createGain();
-
-    osc.type = type;
-    osc.frequency.value = frequency;
-
-    gain.gain.setValueAtTime(.04, state.audio.currentTime);
-    gain.gain.exponentialRampToValueAtTime(.001, state.audio.currentTime + duration);
-
-    osc.connect(gain);
-    gain.connect(state.audio.destination);
-
-    osc.start();
-    osc.stop(state.audio.currentTime + duration);
-  } catch (error) {
-    console.warn("Audio error:", error);
-  }
-}
-
-function createParticles(x, y, color, count = 12) {
-  for (let i = 0; i < count; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 80 + Math.random() * 220;
-
-    state.particles.push({
-      x,
-      y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      life: .4 + Math.random() * .3,
-      color
-    });
-  }
-}
-
-// Phase 17: Boss Variety
-function spawnEnemy(isBoss = false) {
-  const side = Math.floor(Math.random() * 4);
-  let x;
-  let y;
-
-  if (side === 0) {
-    x = Math.random() * WORLD.width;
-    y = 70;
-  } else if (side === 1) {
-    x = WORLD.width - 70;
-    y = Math.random() * WORLD.height;
-  } else if (side === 2) {
-    x = Math.random() * WORLD.width;
-    y = WORLD.height - 70;
-  } else {
-    x = 70;
-    y = Math.random() * WORLD.height;
-  }
-
-  if (isBoss) {
-    const bossTypes = ["fast", "tank", "ranged"];
-    const bossType = bossTypes[Math.floor(Math.random() * 3)];
-
-    const bossConfig = {
-      fast: { health: 250 + player.level * 50, speed: 180, damage: 14, radius: 28, color: "#ff9f43" },
-      tank: { health: 500 + player.level * 100, speed: 70, damage: 25, radius: 42, color: "#ff5a5a" },
-      ranged: { health: 300 + player.level * 60, speed: 100, damage: 16, radius: 30, color: "#4cc9f0" }
-    };
-
-    const config = bossConfig[bossType];
-
-    state.boss = {
-      x,
-      y,
-      radius: config.radius,
-      health: config.health,
-      maxHealth: config.health,
-      speed: config.speed,
-      damage: config.damage,
-      isBoss: true,
-      bossType,
-      attackCooldown: 1.5,
-      shootCooldown: 2,
-      color: config.color,
-      knockX: 0,
-      knockY: 0
-    };
-
-    const bossNames = {
-      fast: "FAST BOSS",
-      tank: "TANK BOSS",
-      ranged: "RANGED BOSS"
-    };
-
-    bossName.textContent = `LEVEL ${player.level} — ${bossNames[bossType]}`;
-    bossBar.classList.add("active");
-
-    return;
-  }
-
-  state.enemies.push({
-    x,
-    y,
-    radius: 17,
-    health: 55 + player.level * 8,
-    maxHealth: 55 + player.level * 8,
-    speed: 85 + player.level * 3,
-    damage: 10 + player.level,
-    isBoss: false,
-    hasGun: true,
-    shootCooldown: 2 + Math.random() * 2,
-    attackCooldown: 1 + Math.random(),
-    color: "#ff9f43",
-    knockX: 0,
-    knockY: 0
-  });
-}
-
-function spawnWeaponCrate() {
-  const weapons = ["rifle", "shotgun", "sniper"];
-  const randomWeapon = weapons[Math.floor(Math.random() * weapons.length)];
-
-  state.weaponCrates.push({
-    x: Math.random() * WORLD.width,
-    y: Math.random() * WORLD.height,
-    weapon: randomWeapon,
-    opened: false
-  });
-}
-
-function startLevel() {
-  state.enemies = [];
-  state.coins = [];
-  state.particles = [];
-  state.boss = null;
-  state.levelTransition = false;
-  state.weaponCrates = [];
-  state.powerups = [];
-
-  bossBar.classList.remove("active");
-
-  player.x = WORLD.width / 2;
-  player.y = WORLD.height / 2;
-  state.zone = {
-    x: WORLD.width / 2,
-    y: WORLD.height / 2,
-    radius: SAFE_ZONE.initialRadius,
-    elapsed: 0
-  };
-  state.zoneDamageTimer = 0;
-  state.zoneWarningTimer = 0;
-  player.health = player.maxHealth;
-  player.combo = 0;
-  player.specialEnergy = 0;
-
-  player.pet.x = player.x;
-  player.pet.y = player.y;
-
-  player2.x = WORLD.width / 2 - 100;
-  player2.y = WORLD.height / 2;
-  player2.health = player2.maxHealth;
-
-  state.enemiesToSpawn = 4 + player.level * 2;
-  state.spawnTimer = .5;
-
-  // Phase 18: Biome change
-  currentBiome = getRandomBiome();
-
-  if (window.applyBiome) {
-    window.applyBiome(currentBiome);
-  }
-
-  showMessage(`MAP: ${BIOMES[currentBiome].name} — LEVEL ${player.level}`, 1.5);
-
-  if (player.level > 1) {
-    spawnWeaponCrate();
-  }
-
-  if (player.level % 3 === 0) {
-    spawnEnemy(true);
-    showMessage(`LEVEL ${player.level} — BOSS FIGHT!`, 2);
-  }
-
-  updateHud();
-}
-
-function resetGame() {
-  state.running = true;
-  state.ended = false;
-  state.elapsed = 0;
-
-  overlay.classList.add("hidden");
-  startBtn.textContent = "PLAY AGAIN";
-
-  startBackgroundMusic();
-  startLevel();
-}
-
-function updateHud() {
-  healthValue.textContent = Math.ceil(player.health);
-  healthBar.style.width = `${Math.max(0, player.health / player.maxHealth * 100)}%`;
-  specialBar.style.width = `${player.specialEnergy}%`;
-
-  comboValue.textContent = player.combo;
-  coinValue.textContent = player.coins;
-  coinHud.textContent = player.coins;
-  levelValue.textContent = player.level;
-
-  enemyValue.textContent =
-    state.enemies.length +
-    state.enemiesToSpawn +
-    (state.boss ? 1 : 0);
-
-  blockValue.textContent =
-    player.blockCooldown > 0
-      ? `${Math.ceil(player.blockCooldown)}s`
-      : "READY";
-
-  dodgeValue.textContent =
-    player.dodgeCooldown > 0
-      ? `${Math.ceil(player.dodgeCooldown)}s`
-      : "READY";
-
-  if (ammoValue) {
-    const gun = player.weapons[player.activeWeapon];
-    ammoValue.textContent = `${gun.ammo}/${gun.reserve}`;
-  }
-
-  if (state.boss) {
-    bossHealth.style.width = `${Math.max(
-      0,
-      state.boss.health / state.boss.maxHealth * 100
-    )}%`;
-  }
-
-  if (shopCoins) {
-    shopCoins.textContent = player.coins;
-  }
-}
-
-function attack(type) {
-  if (!state.running || player.attackCooldown > 0) return;
-
-  if (type === "special") {
-    if (player.specialEnergy < 100) {
-      showMessage("SPECIAL NOT READY");
-      return;
-    }
-
-    player.specialEnergy = 0;
-    player.attackCooldown = .8;
-    player.attackType = "special";
-    player.attackTime = .3;
-    state.shake = .5;
-    state.slowMotion = .8;
-
-    createParticles(player.x, player.y, "#4cc9f0", 35);
-    playSound(90, .35, "sawtooth");
-    showMessage("SHUBHAM JI SPECIAL!", 1);
-
-    for (const enemy of [...state.enemies]) {
-      damageEnemy(enemy, player.damage * 3, true);
-    }
-
-    if (state.boss) {
-      damageEnemy(state.boss, player.damage * 3, true);
-    }
-
-    return;
-  }
-
-  player.attackCooldown = type === "punch" ? .28 : .45;
-  player.attackType = type;
-  player.attackTime = .16;
-
-  player.combo++;
-  player.comboTimer = 1.6;
-  player.specialEnergy = Math.min(100, player.specialEnergy + 8);
-
-  const range = type === "punch" ? 52 : 68;
-  const damage =
-    (type === "punch" ? player.damage : player.damage * 1.6) *
-    getPowerupDamageMultiplier();
-
-  playSound(type === "punch" ? 260 : 180, .06);
-
-  let hit = false;
-
-  for (const enemy of [...state.enemies]) {
-    const distance = Math.hypot(
-      enemy.x - player.x,
-      enemy.y - player.y
-    );
-
-    if (distance < range + enemy.radius) {
-      damageEnemy(enemy, damage, false);
-      hit = true;
-    }
-  }
-
-  if (state.boss) {
-    const bossDistance = Math.hypot(
-      state.boss.x - player.x,
-      state.boss.y - player.y
-    );
-
-    if (bossDistance < range + state.boss.radius) {
-      damageEnemy(state.boss, damage, false);
-      hit = true;
-    }
-  }
-
-  if (hit) {
-    state.shake = .12;
-
-    createParticles(
-      player.x + Math.cos(player.angle) * 40,
-      player.y + Math.sin(player.angle) * 40,
-      "#ffcc4d",
-      8
-    );
-  }
-}
-
-function shootGun() {
-  if (!state.running) return;
-  if (player.fireCooldown > 0 || player.reloadTime > 0) return;
-
-  const weapon = WEAPONS[player.activeWeapon];
-  const gunAmmo = player.weapons[player.activeWeapon];
-
-  if (gunAmmo.ammo <= 0) {
-    reloadGun();
-    return;
-  }
-
-  gunAmmo.ammo--;
-  player.fireCooldown = weapon.fireRate;
-
-  for (let i = 0; i < weapon.pellets; i++) {
-    const spread = (Math.random() - .5) * weapon.spread;
-    const angle = player.angle + spread;
-
-    const targetX = player.x + Math.cos(angle) * weapon.range;
-    const targetY = player.y + Math.sin(angle) * weapon.range;
-
-    let hitEnemy = null;
-
-    for (const enemy of state.enemies) {
-      const distance = Math.hypot(enemy.x - player.x, enemy.y - player.y);
-
-      if (distance > weapon.range) continue;
-
-      const enemyAngle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
-      const angleDiff = Math.abs(angle - enemyAngle);
-
-      if (angleDiff < .18) {
-        hitEnemy = enemy;
-        break;
-      }
-    }
-
-    if (state.boss) {
-      const bossDistance = Math.hypot(state.boss.x - player.x, state.boss.y - player.y);
-
-      if (bossDistance <= weapon.range) {
-        const bossAngle = Math.atan2(state.boss.y - player.y, state.boss.x - player.x);
-        const bossAngleDiff = Math.abs(angle - bossAngle);
-
-        if (bossAngleDiff < .22) {
-          hitEnemy = state.boss;
-        }
-      }
-    }
-
-    if (hitEnemy) {
-      damageEnemy(hitEnemy, weapon.damage * getPowerupDamageMultiplier(), false);
-      createParticles(hitEnemy.x, hitEnemy.y, "#ffffff", 6);
-    }
-
-    if (window.createGunTracer) {
-      window.createGunTracer(
-        player.x,
-        player.y,
-        hitEnemy ? hitEnemy.x : targetX,
-        hitEnemy ? hitEnemy.y : targetY
-      );
-    }
-  }
-
-  state.shake = .15;
-  playGunShotSound();
-
-  if (window.showMuzzleFlash) {
-    window.showMuzzleFlash();
-  }
-
-  updateHud();
-}
-
-function reloadGun() {
-  const weapon = WEAPONS[player.activeWeapon];
-  const gunAmmo = player.weapons[player.activeWeapon];
-
-  if (
-    player.reloadTime > 0 ||
-    gunAmmo.ammo >= weapon.magazine ||
-    gunAmmo.reserve <= 0
-  ) {
-    return;
-  }
-
-  player.reloadTime = weapon.reloadTime;
-  showMessage("RELOADING...");
-
-  setTimeout(() => {
-    const need = weapon.magazine - gunAmmo.ammo;
-    const load = Math.min(need, gunAmmo.reserve);
-
-    gunAmmo.ammo += load;
-    gunAmmo.reserve -= load;
-
-    player.reloadTime = 0;
-    showMessage("RELOADED!");
-    updateHud();
-  }, weapon.reloadTime * 1000);
-}
-
-function switchGun() {
-  const order = ["pistol", "rifle", "shotgun", "sniper"];
-  const currentIndex = order.indexOf(player.activeWeapon);
-
-  for (let i = 1; i <= 4; i++) {
-    const next = order[(currentIndex + i) % 4];
-
-    if (player.weapons[next].unlocked) {
-      player.activeWeapon = next;
-      showMessage(`${WEAPONS[next].name} SELECTED`);
-      updateHud();
-      return;
-    }
-  }
-}
-
-function damageEnemy(enemy, damage, knockback) {
-  enemy.health -= damage;
-
-  if (knockback) {
-    const angle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
-
-    enemy.knockX = Math.cos(angle) * 320;
-    enemy.knockY = Math.sin(angle) * 320;
-  }
-
-  createParticles(enemy.x, enemy.y, "#ffffff", 6);
-  playHitSound();
-
-  if (enemy.health <= 0) {
-    unlockAchievement("firstBlood");
-
-    if (enemy.isBoss) {
-      unlockAchievement("bossSlayer");
-
-      state.boss = null;
-      bossBar.classList.remove("active");
-
-      player.coins += 100;
-      state.slowMotion = 1.5;
-      state.shake = .8;
-
-      showMessage("BOSS DEFEATED!", 2);
-      playVictoryJingle();
-      createParticles(enemy.x, enemy.y, "#ffcc4d", 60);
-      playSound(70, .5, "sawtooth");
-
-      nextLevel();
-    } else {
-      const index = state.enemies.indexOf(enemy);
-
-      if (index !== -1) {
-        state.enemies.splice(index, 1);
-      }
-
-      player.coins += 10;
-      createParticles(enemy.x, enemy.y, "#ffcc4d", 18);
-      state.coins.push({
-        x: enemy.x,
-        y: enemy.y,
-        value: 10
-      });
-    }
-
-    saveGame();
-  }
-
-  updateHud();
-}
-
-function nextLevel() {
-  if (state.levelTransition) return;
-
-  state.levelTransition = true;
-
-  player.level++;
-  player.damage += 3;
-  player.maxHealth += 10;
-  player.health = player.maxHealth;
-
-  showMessage(`LEVEL ${player.level - 1} COMPLETE!`, 1.5);
-
-  saveGame();
-
-  setTimeout(() => {
-    if (state.running) {
-      startLevel();
-    }
-  }, 1600);
-}
-
-function damagePlayer(amount) {
-  if (player.invincible > 0) return;
-
-  if (player.blockTime > 0) {
-    amount *= .25;
-    showMessage("BLOCKED!");
-    playSound(320, .05);
-  }
-
-  // Phase 19: Shield
-  if (state.activePowerup === "shield") {
-    amount *= .5;
-    showMessage("SHIELD BLOCKED HALF!");
-  }
-
-  player.health -= amount;
-  player.combo = 0;
-  player.invincible = .35;
-  state.shake = .25;
-
-  createParticles(player.x, player.y, "#ff5a5a", 10);
-  playSound(120, .1);
-
-  if (player.health <= 0) {
-    finishGame(false);
-  }
-
-  updateHud();
-}
-
-function finishGame(won) {
-  state.running = false;
-  state.ended = true;
-  state.mobileFiring = false;
-
-  saveLeaderboardEntry();
-
-  overlay.classList.remove("hidden");
-
-  const title = document.querySelector(".intro-card h1");
-  const text = document.querySelector(".intro-card p");
-
-  title.innerHTML = won
-    ? 'VICTORY<br /><span>SHUBHAM JI!</span>'
-    : 'GAME OVER<br /><span>TRY AGAIN</span>';
-
-  text.textContent = won
-    ? `Tumne Level ${player.level} clear kar diya!`
-    : `Tum Level ${player.level} mein haar gaye. Coins: ${player.coins}`;
-
-  startBtn.innerHTML = 'PLAY AGAIN <span>→</span>';
-
-  stopBackgroundMusic();
-}
-
-function updatePet(dt) {
-  const pet = player.pet;
-
-  if (!pet || !pet.unlocked) return;
-
-  const dx = player.x - pet.x;
-  const dy = player.y - pet.y;
-  const distance = Math.hypot(dx, dy);
-
-  if (distance > 70) {
-    const angle = Math.atan2(dy, dx);
-
-    const typeSpeed = pet.type === "dragon" ? 260 : pet.type === "cat" ? 230 : 200;
-    const petSpeed = typeSpeed + pet.level * 20;
-
-    pet.x += Math.cos(angle) * petSpeed * dt;
-    pet.y += Math.sin(angle) * petSpeed * dt;
-  }
-
-  for (let i = state.coins.length - 1; i >= 0; i--) {
-    const coin = state.coins[i];
-    const coinDistance = Math.hypot(pet.x - coin.x, pet.y - coin.y);
-
-    if (coinDistance < pet.coinRange) {
-      player.coins += coin.value;
-      state.coins.splice(i, 1);
-
-      createParticles(coin.x, coin.y, "#ffcc4d", 10);
-      playSound(660, .07);
-
-      saveGame();
-      updateHud();
-    }
-  }
-
-  pet.healTimer -= dt;
-
-  if (pet.healTimer <= 0) {
-    pet.healTimer = 30;
-
-    if (player.health < player.maxHealth) {
-      player.health = Math.min(
-        player.maxHealth,
-        player.health + 10 + pet.level * 5
-      );
-
-      createParticles(player.x, player.y, "#7ee787", 14);
-      showMessage("PET HEAL!", 1);
-      playSound(560, .1);
-      updateHud();
-    }
-  }
-}
-
-// Phase 16: Player 2 functions
-function player2Attack(type) {
-  if (!state.running || player2.attackCooldown > 0) return;
-
-  player2.attackCooldown = type === "punch" ? .28 : .45;
-  player2.attackType = type;
-  player2.attackTime = .16;
-  player2.combo++;
-  player2.comboTimer = 1.6;
-
-  const range = type === "punch" ? 52 : 68;
-  const damage = type === "punch" ? player2.damage : player2.damage * 1.6;
-
-  let hit = false;
-
-  for (const enemy of [...state.enemies]) {
-    const distance = Math.hypot(enemy.x - player2.x, enemy.y - player2.y);
-
-    if (distance < range + enemy.radius) {
-      damageEnemy(enemy, damage, false);
-      hit = true;
-    }
-  }
-
-  if (hit) {
-    state.shake = .12;
-    playSound(260, .06);
-  }
-}
-
-function player2Shoot() {
-  if (!state.running || player2.fireCooldown > 0 || player2.reloadTime > 0) return;
-
-  const gunAmmo = player2.weapons[player2.activeWeapon];
-
-  if (gunAmmo.ammo <= 0) {
-    player2Reload();
-    return;
-  }
-
-  gunAmmo.ammo--;
-  player2.fireCooldown = .35;
-
-  const angle = player2.angle;
-  const targetX = player2.x + Math.cos(angle) * 420;
-  const targetY = player2.y + Math.sin(angle) * 420;
-
-  let hitEnemy = null;
-
-  for (const enemy of state.enemies) {
-    const distance = Math.hypot(enemy.x - player2.x, enemy.y - player2.y);
-
-    if (distance > 420) continue;
-
-    const enemyAngle = Math.atan2(enemy.y - player2.y, enemy.x - player2.x);
-    const angleDiff = Math.abs(angle - enemyAngle);
-
-    if (angleDiff < .18) {
-      hitEnemy = enemy;
+    if (found && found.alive) {
+      hitEnemy = found;
+      hitPoint = hit.point.clone();
       break;
     }
   }
 
   if (hitEnemy) {
-    damageEnemy(hitEnemy, 22, false);
+    const headshot = hitPoint.y - hitEnemy.group.position.y > 2.12;
+    const damage = w.damage * (headshot ? 2 : 1);
+    hitEnemy.health -= damage;
+    hitEnemy.healthBar.scale.x = clamp(hitEnemy.health / hitEnemy.maxHealth, 0, 1);
+    hitEnemy.healthBar.material.color.set(hitEnemy.health > 35 ? 0x34ff7a : 0xff4d4d);
+    const crosshair = document.getElementById('crosshair');
+    crosshair.classList.add('hit');
+    clearTimeout(shoot.hitTimer);
+    shoot.hitTimer = setTimeout(() => crosshair.classList.remove('hit'), 130);
+    const spark = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), new THREE.MeshBasicMaterial({ color: 0xff6d5c, transparent: true, opacity: 0.9 }));
+    spark.position.copy(hitPoint); scene.add(spark); world.particles.push({ mesh: spark, life: 0.1, maxLife: 0.1 });
+    showToast(headshot ? `HEADSHOT - ${Math.round(damage)} damage` : `${Math.round(damage)} damage`);
+    if (hitEnemy.health <= 0) {
+      hitEnemy.alive = false;
+      hitEnemy.group.visible = false;
+      player.kills += 1;
+      player.coins += 25;
+      uiUpdate();
+      showToast('Enemy eliminated +25 coins');
+    }
+  } else {
+    const far = camera.position.clone().add(raycaster.ray.direction.clone().multiplyScalar(40));
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffe39a, transparent: true, opacity: 0.9 }));
+    p.position.copy(far); scene.add(p); world.particles.push({ mesh: p, life: 0.08, maxLife: 0.08 });
   }
+}
 
-  if (window.createGunTracer) {
-    window.createGunTracer(
-      player2.x,
-      player2.y,
-      hitEnemy ? hitEnemy.x : targetX,
-      hitEnemy ? hitEnemy.y : targetY
-    );
+function showPickupPrompt(text) {
+  if (!text) { hud.pickup.classList.remove('visible'); return; }
+  hud.pickup.textContent = `Press E to pick up ${text}`;
+  hud.pickup.classList.add('visible');
+}
+
+function handlePickup() {
+  let closest = null;
+  for (const item of world.loot) {
+    if (item.collected) continue;
+    const dx = item.mesh.position.x - player.pos.x; const dz = item.mesh.position.z - player.pos.z; const d = Math.hypot(dx, dz);
+    if (d < 2.3 && (!closest || d < closest.d)) closest = { item, d };
   }
-
-  state.shake = .15;
-  playGunShotSound();
-  updateHud();
+  if (!closest) return;
+  const { item } = closest;
+  showPickupPrompt(item.type);
+  if (item.type === 'medkit') { player.loot.medkit += 1; player.hp = clamp(player.hp + 20, 0, player.maxHp); showToast('Medkit collected'); }
+  else if (item.type === 'ammo') { player.loot.ammo += 1; player.weapons[0].reserve += 12; player.weapons[1].reserve += 20; showToast('Ammo stash collected'); }
+  else if (item.type === 'armor') { player.loot.armor += 1; player.maxHp = 120; player.hp = clamp(player.hp + 25, 0, player.maxHp); showToast('Armor equipped'); }
+  else if (item.type === 'boost') { player.loot.boost += 1; player.speedBoost = 1.35; showToast('Boost activated'); setTimeout(() => player.speedBoost = 1, 3000); }
+  else if (item.type === 'backpack') { player.loot.backpack += 1; player.weapons[2].reserve += 12; showToast('Backpack secured'); }
+  else if (item.type === 'rare') { player.loot.rare += 1; player.coins += 50; showToast('Rare loot found'); }
+  else if (item.type === 'epic') { player.loot.epic += 1; player.coins += 120; showToast('Epic loot found'); }
+  item.collected = true; scene.remove(item.mesh); renderInventory(); uiUpdate(); showPickupPrompt('');
 }
 
-function player2Reload() {
-  const gunAmmo = player2.weapons[player2.activeWeapon];
-
-  if (player2.reloadTime > 0 || gunAmmo.ammo >= 12 || gunAmmo.reserve <= 0) return;
-
-  player2.reloadTime = 1.1;
-  showMessage("P2 RELOADING...");
-
-  setTimeout(() => {
-    const need = 12 - gunAmmo.ammo;
-    const load = Math.min(need, gunAmmo.reserve);
-
-    gunAmmo.ammo += load;
-    gunAmmo.reserve -= load;
-    player2.reloadTime = 0;
-    updateHud();
-  }, 1100);
+function useMedkit() {
+  if (player.loot.medkit <= 0 || player.hp >= player.maxHp) return;
+  player.loot.medkit -= 1;
+  player.hp = clamp(player.hp + 35, 0, player.maxHp);
+  renderInventory();
+  uiUpdate();
+  showToast('Medkit used');
 }
 
-function player2SwitchGun() {
-  showMessage("P2: SIRF PISTOL HAI");
-}
-
-function player2Block() {
-  if (!state.running || player2.blockCooldown > 0) return;
-
-  player2.blockTime = .8;
-  player2.blockCooldown = 2.5;
-  showMessage("P2 BLOCK!");
-  playSound(420, .07);
-}
-
-function player2Dodge() {
-  if (!state.running || player2.dodgeCooldown > 0) return;
-
-  player2.dodgeTime = .22;
-  player2.dodgeCooldown = 2;
-  player2.invincible = .3;
-  showMessage("P2 DODGE!");
-  playSound(520, .08);
-}
-
-function update(dt) {
-  state.elapsed += dt;
-  state.shake = Math.max(0, state.shake - dt);
-  state.slowMotion = Math.max(0, state.slowMotion - dt);
-  state.messageTimer = Math.max(0, state.messageTimer - dt);
-
-  player.attackCooldown = Math.max(0, player.attackCooldown - dt);
-  player.attackTime = Math.max(0, player.attackTime - dt);
-  player.blockTime = Math.max(0, player.blockTime - dt);
-  player.blockCooldown = Math.max(0, player.blockCooldown - dt);
-  player.dodgeTime = Math.max(0, player.dodgeTime - dt);
-  player.dodgeCooldown = Math.max(0, player.dodgeCooldown - dt);
-  player.invincible = Math.max(0, player.invincible - dt);
-  player.comboTimer = Math.max(0, player.comboTimer - dt);
-  player.fireCooldown = Math.max(0, player.fireCooldown - dt);
-
-  if (player.comboTimer <= 0) {
-    player.combo = 0;
+function updateNearbyPickupPrompt() {
+  let nearest = null;
+  for (const item of world.loot) {
+    if (item.collected) continue;
+    const distance = Math.hypot(item.mesh.position.x - player.pos.x, item.mesh.position.z - player.pos.z);
+    if (distance < 2.3 && (!nearest || distance < nearest.distance)) nearest = { item, distance };
   }
+  showPickupPrompt(nearest ? nearest.item.type : '');
+}
 
-  if (state.mobileFiring) {
-    shootGun();
+function damagePlayer(amount) {
+  player.hp = clamp(player.hp - amount, 0, player.maxHp);
+  if (player.hp <= 0) showToast('You were eliminated');
+  uiUpdate();
+}
+
+function updatePlayer(dt) {
+  const moveX = clamp((keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + joystick.x, -1, 1);
+  const moveZ = clamp((keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) - joystick.y, -1, 1);
+  const dirX = Math.sin(player.cameraYaw), dirZ = Math.cos(player.cameraYaw);
+  const sideX = Math.cos(player.cameraYaw), sideZ = -Math.sin(player.cameraYaw);
+  let dx = 0, dz = 0;
+  if (moveZ !== 0) { dx += dirX * moveZ; dz += dirZ * moveZ; }
+  if (moveX !== 0) { dx += sideX * moveX; dz += sideZ * moveX; }
+  if (dx || dz) {
+    const len = Math.hypot(dx, dz) || 1;
+    dx /= len; dz /= len;
+    const speed = (keys.Shift ? 8.5 : 4.8) * player.speedBoost;
+    const nx = player.pos.x + dx * speed * dt; const nz = player.pos.z + dz * speed * dt;
+    if (!collides(nx, player.pos.z, player.radius)) player.pos.x = nx;
+    if (!collides(player.pos.x, nz, player.radius)) player.pos.z = nz;
+    player.group.rotation.y = Math.atan2(dx, dz);
+    player.walkPhase += dt * (keys.Shift ? 13 : 9);
+  } else {
+    player.walkPhase = 0;
   }
+  if (player.jumpRequested && player.onGround) { player.jumpVel = 8.4; player.onGround = false; }
+  player.jumpRequested = false;
+  player.jumpVel -= 18 * dt; player.pos.y += player.jumpVel * dt;
+  if (player.pos.y <= 0) { player.pos.y = 0; player.jumpVel = 0; player.onGround = true; }
+  player.group.position.copy(player.pos);
+  player.limbs.forEach((limb, index) => {
+    const phase = player.walkPhase + (index >= 2 ? Math.PI : 0);
+    const swing = player.walkPhase ? Math.sin(phase) : 0;
+    limb.rotation.x = index % 2 === 0 ? -0.85 + swing * 0.18 : swing * 0.48;
+  });
+  const cameraDistance = player.aiming ? 5.3 : 8;
+  const camOffset = new THREE.Vector3(-Math.sin(player.cameraYaw) * cameraDistance, 4.8 + Math.sin(player.pitch) * 3.2, -Math.cos(player.cameraYaw) * cameraDistance);
+  const targetPos = player.pos.clone().add(camOffset);
+  camera.position.lerp(targetPos, 1 - Math.exp(-dt * 8));
+  camera.fov = THREE.MathUtils.lerp(camera.fov, player.aiming ? 48 : 65, 1 - Math.exp(-dt * 10));
+  camera.updateProjectionMatrix();
+  camera.lookAt(player.pos.clone().add(new THREE.Vector3(Math.sin(player.cameraYaw) * 5, 1.7 + Math.sin(player.pitch) * 2, Math.cos(player.cameraYaw) * 5)));
 
+  if (player.reloadTime > 0) {
+    player.reloadTime -= dt;
+    if (player.reloadTime <= 0) finishReload();
+  }
+  if (player.fireCooldown > 0) player.fireCooldown -= dt;
+  if (player.firing) shoot();
+  updateNearbyPickupPrompt();
+}
+
+function hasLineOfSight(from, to) {
+  const distance = from.distanceTo(to);
+  const steps = Math.ceil(distance / 1.5);
+  for (let i = 1; i < steps; i++) {
+    const point = from.clone().lerp(to, i / steps);
+    if (world.colliders.some(b => Math.abs(point.x - b.x) < b.w / 2 && Math.abs(point.z - b.z) < b.d / 2 && point.y < b.h)) return false;
+  }
+  return true;
+}
+
+function enemyShoot(enemy, target) {
+  const start = enemy.group.localToWorld(new THREE.Vector3(0.25, 1.65, 1.42));
+  const aim = target.clone().add(new THREE.Vector3(0, 1.25, 0));
+  const direction = aim.sub(start).normalize();
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff8b52 }));
+  mesh.position.copy(start);
+  scene.add(mesh);
+  world.hostileShots.push({ mesh, velocity: direction.multiplyScalar(34), life: 1.8, damage: 7 + Math.random() * 5 });
+}
+
+function updateEnemies(dt) {
+  for (const e of world.enemies) {
+    if (!e.alive) continue;
+    const to = new THREE.Vector3(player.pos.x - e.group.position.x, 0, player.pos.z - e.group.position.z);
+    const dist = to.length();
+    if (dist > 0.1) {
+      const dir = to.normalize();
+      if (dist > 14) {
+        const nx = e.group.position.x + dir.x * e.speed * dt; const nz = e.group.position.z + dir.z * e.speed * dt;
+        if (!collides(nx, e.group.position.z, 0.7)) e.group.position.x = nx;
+        if (!collides(e.group.position.x, nz, 0.7)) e.group.position.z = nz;
+      }
+      e.group.rotation.y = Math.atan2(dir.x, dir.z);
+    }
+    e.limbs.forEach((limb, index) => {
+      const phase = world.time * 8 + (index >= 2 ? Math.PI : 0);
+      const swing = dist > 14 ? Math.sin(phase) : 0;
+      limb.rotation.x = index % 2 === 0 ? -0.85 + swing * 0.18 : swing * 0.42;
+    });
+    e.healthBar.lookAt(camera.position);
+    const target = new THREE.Vector3(player.pos.x, 1.25, player.pos.z);
+    const muzzle = e.group.localToWorld(new THREE.Vector3(0.25, 1.65, 1.42));
+    if (dist < 38 && e.attackCooldown <= 0 && hasLineOfSight(muzzle, target)) {
+      enemyShoot(e, player.pos);
+      e.attackCooldown = 1.35 + Math.random() * 0.65;
+    }
+    e.attackCooldown = Math.max(0, e.attackCooldown - dt);
+  }
+}
+
+function updateHostileShots(dt) {
+  const playerTarget = new THREE.Vector3(player.pos.x, player.pos.y + 1.25, player.pos.z);
+  for (let i = world.hostileShots.length - 1; i >= 0; i--) {
+    const shot = world.hostileShots[i];
+    shot.life -= dt;
+    shot.mesh.position.addScaledVector(shot.velocity, dt);
+    if (shot.mesh.position.distanceTo(playerTarget) < 0.85) {
+      damagePlayer(shot.damage);
+      scene.remove(shot.mesh);
+      world.hostileShots.splice(i, 1);
+    } else if (shot.life <= 0 || shot.mesh.position.distanceTo(player.group.position) > 45) {
+      scene.remove(shot.mesh);
+      world.hostileShots.splice(i, 1);
+    }
+  }
+}
+
+function updateSafeZone(dt) {
+  const newRadius = Math.max(world.minRadius, 90 - world.time * 0.5);
+  world.safeRadius = THREE.MathUtils.lerp(world.safeRadius, newRadius, 0.08);
+  if (world.zoneRing) { world.zoneRing.scale.setScalar(world.safeRadius / 90); world.zoneRing.visible = true; }
+  if (Math.hypot(player.pos.x, player.pos.z) > world.safeRadius) {
+    world.zoneTimer += dt; if (world.zoneTimer > 0.7) { damagePlayer(7); world.zoneTimer = 0; }
+  } else world.zoneTimer = 0;
+}
+
+function updateParticles(dt) {
+  for (let i = world.particles.length - 1; i >= 0; i--) {
+    const p = world.particles[i];
+    p.life -= dt;
+    p.mesh.material.opacity = clamp(p.life / p.maxLife, 0, 1);
+    p.mesh.scale.setScalar(1 + (p.maxLife - p.life) * 18);
+    if (p.life <= 0) { scene.remove(p.mesh); world.particles.splice(i, 1); }
+  }
+}
+
+function drawMiniMap() {
+  const ctx = document.getElementById('minimap').getContext('2d');
+  const s = 180;
+  ctx.clearRect(0, 0, s, s);
+  ctx.fillStyle = 'rgba(10, 16, 13, 0.8)'; ctx.beginPath(); ctx.arc(s / 2, s / 2, s * 0.44, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(150, 255, 165, 0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(s / 2, s / 2, s * 0.44, 0, Math.PI * 2); ctx.stroke();
+  const zone = (world.safeRadius / 120) * (s * 0.42); ctx.strokeStyle = 'rgba(255, 214, 94, 0.9)'; ctx.beginPath(); ctx.arc(s / 2, s / 2, zone, 0, Math.PI * 2); ctx.stroke();
+  for (const b of world.colliders) {
+    const x = s / 2 + (b.x / 120) * (s * 0.42); const z = s / 2 + (b.z / 120) * (s * 0.42); const w = (b.w / 240) * (s * 0.84); const d = (b.d / 240) * (s * 0.84);
+    ctx.fillStyle = 'rgba(173, 130, 96, 0.7)'; ctx.fillRect(x - w / 2, z - d / 2, w, d);
+  }
+  for (const item of world.loot) if (!item.collected) { const x = s / 2 + (item.mesh.position.x / 120) * (s * 0.42); const z = s / 2 + (item.mesh.position.z / 120) * (s * 0.42); ctx.fillStyle = item.type === 'epic' ? '#ffd166' : item.type === 'rare' ? '#c59bff' : '#7be0ff'; ctx.fillRect(x - 2, z - 2, 4, 4); }
+  for (const e of world.enemies) if (e.alive) { const x = s / 2 + (e.group.position.x / 120) * (s * 0.42); const z = s / 2 + (e.group.position.z / 120) * (s * 0.42); ctx.fillStyle = '#ff5d5d'; ctx.fillRect(x - 2.5, z - 2.5, 5, 5); }
+  const px = s / 2 + (player.pos.x / 120) * (s * 0.42); const pz = s / 2 + (player.pos.z / 120) * (s * 0.42); ctx.fillStyle = '#66ffb0'; ctx.fillRect(px - 3.5, pz - 3.5, 7, 7);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  world.time += dt;
+  updatePlayer(dt);
+  updateEnemies(dt);
+  updateHostileShots(dt);
   updateSafeZone(dt);
-
-  let dx =
-    Number(keys.has("d")) -
-    Number(keys.has("a"));
-
-  let dy =
-    Number(keys.has("s")) -
-    Number(keys.has("w"));
-
-  const moveLength = Math.hypot(dx, dy);
-
-  if (moveLength) {
-    dx /= moveLength;
-    dy /= moveLength;
-
-    player.angle = Math.atan2(dy, dx);
-
-    const speed =
-      (player.dodgeTime > 0
-        ? player.speed * 2.6
-        : player.speed) *
-      getPowerupSpeedMultiplier() *
-      (Number(sensitivity.value) / 100);
-
-    player.x += dx * speed * dt;
-    player.y += dy * speed * dt;
-  }
-
-  player.x = Math.max(30, Math.min(WORLD.width - 30, player.x));
-  player.y = Math.max(30, Math.min(WORLD.height - 30, player.y));
-
-  // Phase 14: River slow + House cover
-  if (isInRiver(player.x, player.y)) {
-    player.x += dx * player.speed * .4 * dt;
-    player.y += dy * player.speed * .4 * dt;
-  }
-
-  if (isNearHouse(player.x, player.y)) {
-    player.invincible = Math.max(player.invincible, .1);
-  }
-
-  updatePet(dt);
-
-  // Phase 16: Player 2 movement
-  let p2dx =
-    Number(player2Keys.has("arrowright")) -
-    Number(player2Keys.has("arrowleft"));
-
-  let p2dy =
-    Number(player2Keys.has("arrowdown")) -
-    Number(player2Keys.has("arrowup"));
-
-  const p2MoveLength = Math.hypot(p2dx, p2dy);
-
-  if (p2MoveLength) {
-    p2dx /= p2MoveLength;
-    p2dy /= p2MoveLength;
-
-    player2.angle = Math.atan2(p2dy, p2dx);
-
-    const p2Speed =
-      player2.dodgeTime > 0 ? player2.speed * 2.6 : player2.speed;
-
-    player2.x += p2dx * p2Speed * dt;
-    player2.y += p2dy * p2Speed * dt;
-  }
-
-  player2.x = Math.max(30, Math.min(WORLD.width - 30, player2.x));
-  player2.y = Math.max(30, Math.min(WORLD.height - 30, player2.y));
-
-  player2.attackCooldown = Math.max(0, player2.attackCooldown - dt);
-  player2.attackTime = Math.max(0, player2.attackTime - dt);
-  player2.blockTime = Math.max(0, player2.blockTime - dt);
-  player2.blockCooldown = Math.max(0, player2.blockCooldown - dt);
-  player2.dodgeTime = Math.max(0, player2.dodgeTime - dt);
-  player2.dodgeCooldown = Math.max(0, player2.dodgeCooldown - dt);
-  player2.invincible = Math.max(0, player2.invincible - dt);
-  player2.fireCooldown = Math.max(0, player2.fireCooldown - dt);
-
-  // Phase 19: Powerups
-  updatePowerups(dt);
-
-  if (state.enemiesToSpawn > 0) {
-    state.spawnTimer -= dt;
-
-    if (state.spawnTimer <= 0) {
-      spawnEnemy();
-      state.enemiesToSpawn--;
-      state.spawnTimer = 1.1;
-    }
-  }
-
-  for (const enemy of state.enemies) {
-    enemy.x += enemy.knockX * dt;
-    enemy.y += enemy.knockY * dt;
-
-    enemy.knockX *= .88;
-    enemy.knockY *= .88;
-
-    // Phase 16: Enemy targets closer player
-    const targetPlayer =
-      Math.hypot(player2.x - enemy.x, player2.y - enemy.y) <
-      Math.hypot(player.x - enemy.x, player.y - enemy.y)
-        ? player2
-        : player;
-
-    const angle = Math.atan2(
-      targetPlayer.y - enemy.y,
-      targetPlayer.x - enemy.x
-    );
-
-    const distance = Math.hypot(
-      targetPlayer.x - enemy.x,
-      targetPlayer.y - enemy.y
-    );
-
-    if (distance > enemy.radius + targetPlayer.radius + 6) {
-      enemy.x += Math.cos(angle) * enemy.speed * dt;
-      enemy.y += Math.sin(angle) * enemy.speed * dt;
-    }
-
-    enemy.attackCooldown -= dt;
-
-    if (
-      distance < enemy.radius + targetPlayer.radius + 10 &&
-      enemy.attackCooldown <= 0
-    ) {
-      if (targetPlayer === player) {
-        damagePlayer(enemy.damage);
-      }
-
-      enemy.attackCooldown = 1.1;
-    }
-
-    // Phase 13: Enemy gun
-    if (enemy.hasGun) {
-      enemy.shootCooldown -= dt;
-
-      if (
-        enemy.shootCooldown <= 0 &&
-        distance < 500 &&
-        distance > 60
-      ) {
-        enemy.shootCooldown = 2.5 + Math.random() * 2;
-
-        const playerCovered = isNearHouse(player.x, player.y);
-        const effectiveChance = playerCovered ? .1 : .35;
-
-        if (targetPlayer === player && Math.random() < effectiveChance) {
-          damagePlayer(enemy.damage * .6);
-          showMessage("ENEMY SHOT YOU!");
-        }
-
-        if (window.createGunTracer) {
-          window.createGunTracer(
-            enemy.x,
-            enemy.y,
-            targetPlayer.x,
-            targetPlayer.y
-          );
-        }
-      }
-    }
-  }
-
-  // Phase 17: Boss update
-  if (state.boss) {
-    const boss = state.boss;
-
-    const angle = Math.atan2(
-      player.y - boss.y,
-      player.x - boss.x
-    );
-
-    const distance = Math.hypot(
-      player.x - boss.x,
-      player.y - boss.y
-    );
-
-    if (boss.bossType === "fast" && distance < 300 && boss.attackCooldown <= 0) {
-      boss.knockX = Math.cos(angle) * 600;
-      boss.knockY = Math.sin(angle) * 600;
-      boss.attackCooldown = 3;
-      showMessage("FAST BOSS DASH!");
-    }
-
-    if (boss.bossType === "ranged") {
-      boss.shootCooldown -= dt;
-
-      if (boss.shootCooldown <= 0 && distance < 600) {
-        boss.shootCooldown = 1.8;
-
-        if (!isNearHouse(player.x, player.y) && Math.random() < .4) {
-          damagePlayer(boss.damage);
-          showMessage("RANGED BOSS SHOT!");
-        }
-
-        if (window.createGunTracer) {
-          window.createGunTracer(boss.x, boss.y, player.x, player.y);
-        }
-      }
-    }
-
-    boss.x += boss.knockX * dt;
-    boss.y += boss.knockY * dt;
-    boss.knockX *= .9;
-    boss.knockY *= .9;
-
-    if (distance > boss.radius + player.radius + 10) {
-      boss.x += Math.cos(angle) * boss.speed * dt;
-      boss.y += Math.sin(angle) * boss.speed * dt;
-    }
-
-    boss.attackCooldown -= dt;
-
-    if (
-      distance < boss.radius + player.radius + 14 &&
-      boss.attackCooldown <= 0 &&
-      boss.bossType !== "ranged"
-    ) {
-      damagePlayer(boss.damage);
-      boss.attackCooldown = 1.4;
-    }
-  }
-
-  for (let i = state.coins.length - 1; i >= 0; i--) {
-    const coin = state.coins[i];
-
-    const distance = Math.hypot(
-      player.x - coin.x,
-      player.y - coin.y
-    );
-
-    if (distance < 45) {
-      player.coins += coin.value;
-      state.coins.splice(i, 1);
-
-      createParticles(coin.x, coin.y, "#ffcc4d", 10);
-      playSound(660, .07);
-
-      saveGame();
-      updateHud();
-    }
-  }
-
-  for (let i = state.weaponCrates.length - 1; i >= 0; i--) {
-    const crate = state.weaponCrates[i];
-    const distance = Math.hypot(player.x - crate.x, player.y - crate.y);
-
-    if (distance < 50 && !crate.opened) {
-      crate.opened = true;
-      player.weapons[crate.weapon].unlocked = true;
-      player.weapons[crate.weapon].ammo = WEAPONS[crate.weapon].magazine;
-      player.weapons[crate.weapon].reserve = WEAPONS[crate.weapon].magazine * 3;
-
-      showMessage(`${WEAPONS[crate.weapon].name} UNLOCKED!`);
-      createParticles(crate.x, crate.y, "#4cc9f0", 20);
-      playSound(700, .15);
-
-      state.weaponCrates.splice(i, 1);
-      updateHud();
-    }
-  }
-
-  if (
-    state.running &&
-    !state.levelTransition &&
-    state.enemiesToSpawn === 0 &&
-    state.enemies.length === 0 &&
-    !state.boss
-  ) {
-    nextLevel();
-  }
-
-  for (let i = state.particles.length - 1; i >= 0; i--) {
-    const particle = state.particles[i];
-
-    particle.x += particle.vx * dt;
-    particle.y += particle.vy * dt;
-
-    particle.vx *= .94;
-    particle.vy *= .94;
-    particle.life -= dt;
-
-    if (particle.life <= 0) {
-      state.particles.splice(i, 1);
-    }
-  }
-
-  actionMessage.textContent =
-    state.messageTimer > 0 ? state.message : "";
-
-  updateHud();
+  updateParticles(dt);
+  drawMiniMap();
+  uiUpdate();
+  renderer.render(scene, camera);
 }
 
-function gameLoop(timestamp) {
-  const dt = Math.min(
-    (timestamp - state.lastFrame) / 1000 || 0,
-    .04
-  );
+function setupInput() {
+  let joystickPointer = null;
+  let lookPointer = null;
+  let firePointer = null;
+  let lookPosition = null;
 
-  state.lastFrame = timestamp;
-
-  if (state.running) {
-    update(dt);
-  }
-
-  if (window.render3D) {
-    window.render3D();
-  }
-
-  requestAnimationFrame(gameLoop);
-}
-
-function setMove(direction, down) {
-  const map = {
-    up: "w",
-    left: "a",
-    down: "s",
-    right: "d"
+  const rotateCamera = (dx, dy) => {
+    player.cameraYaw -= dx * 0.0038;
+    player.pitch = clamp(player.pitch - dy * 0.002, -1.1, 1.1);
   };
 
-  if (down) {
-    keys.add(map[direction]);
-  } else {
-    keys.delete(map[direction]);
-  }
-}
-
-window.addEventListener("keydown", event => {
-  const key = event.key.toLowerCase();
-
-  if (
-    ["arrowup", "arrowdown", "arrowleft", "arrowright", " "]
-      .includes(key)
-  ) {
-    event.preventDefault();
-  }
-
-  keys.add(key);
-
-  if (key.startsWith("arrow")) {
-    player2Keys.add(key);
-  }
-
-  if (event.repeat) return;
-
-  if (key === "j") attack("punch");
-  if (key === "k") attack("kick");
-  if (key === "l") block();
-  if (key === "shift") dodge();
-  if (key === " ") attack("special");
-  if (key === "f") shootGun();
-  if (key === "r") reloadGun();
-  if (key === "q") switchGun();
-
-  // Phase 16: Player 2 controls
-  if (key === "1") player2Shoot();
-  if (key === "2") player2Reload();
-  if (key === "3") player2SwitchGun();
-  if (key === "4") player2Block();
-  if (key === "5") player2Dodge();
-  if (key === "6") player2Attack("punch");
-  if (key === "7") player2Attack("kick");
-  if (key === "8") player2Attack("special");
-
-  if ((key === "enter" || key === " ") && !state.running) {
-    resetGame();
-  }
-});
-
-window.addEventListener("keyup", event => {
-  const key = event.key.toLowerCase();
-
-  keys.delete(key);
-  player2Keys.delete(key);
-});
-
-function block() {
-  if (!state.running || player.blockCooldown > 0) return;
-
-  player.blockTime = .8;
-  player.blockCooldown = 2.5;
-
-  showMessage("BLOCK!");
-  playSound(420, .07);
-}
-
-function dodge() {
-  if (!state.running || player.dodgeCooldown > 0) return;
-
-  player.dodgeTime = .22;
-  player.dodgeCooldown = 2;
-  player.invincible = .3;
-
-  showMessage("DODGE!");
-  createParticles(player.x, player.y, "#4cc9f0", 14);
-  playSound(520, .08);
-}
-
-document.querySelectorAll("[data-move]").forEach(button => {
-  const direction = button.dataset.move;
-
-  button.addEventListener("pointerdown", event => {
-    event.preventDefault();
-    button.setPointerCapture(event.pointerId);
-    setMove(direction, true);
-  });
-
-  for (const name of [
-    "pointerup",
-    "pointercancel",
-    "lostpointercapture"
-  ]) {
-    button.addEventListener(name, () => {
-      setMove(direction, false);
-    });
-  }
-});
-
-document.getElementById("punchButton").addEventListener("pointerdown", event => {
-  event.preventDefault();
-  attack("punch");
-});
-
-document.getElementById("kickButton").addEventListener("pointerdown", event => {
-  event.preventDefault();
-  attack("kick");
-});
-
-document.getElementById("blockButton").addEventListener("pointerdown", event => {
-  event.preventDefault();
-  block();
-});
-
-document.getElementById("dodgeButton").addEventListener("pointerdown", event => {
-  event.preventDefault();
-  dodge();
-});
-
-document.getElementById("specialButton").addEventListener("pointerdown", event => {
-  event.preventDefault();
-  attack("special");
-});
-
-const fireGunButton = document.getElementById("fireGunButton");
-
-if (fireGunButton) {
-  fireGunButton.addEventListener("pointerdown", event => {
-    event.preventDefault();
-    fireGunButton.setPointerCapture(event.pointerId);
-    state.mobileFiring = true;
-    shootGun();
-  });
-
-  for (const name of ["pointerup", "pointercancel", "lostpointercapture"]) {
-    fireGunButton.addEventListener(name, () => {
-      state.mobileFiring = false;
-    });
-  }
-}
-
-const reloadGunButton = document.getElementById("reloadGunButton");
-
-if (reloadGunButton) {
-  reloadGunButton.addEventListener("pointerdown", event => {
-    event.preventDefault();
-    reloadGun();
-  });
-}
-
-const switchGunButton = document.getElementById("switchGunButton");
-
-if (switchGunButton) {
-  switchGunButton.addEventListener("pointerdown", event => {
-    event.preventDefault();
-    switchGun();
-  });
-}
-
-soundBtn.addEventListener("click", () => {
-  state.muted = !state.muted;
-  soundBtn.textContent = state.muted ? "×" : "♪";
-
-  if (state.muted) {
-    stopBackgroundMusic();
-  } else if (state.running) {
-    startBackgroundMusic();
-  }
-});
-
-startBtn.addEventListener("click", resetGame);
-
-if (shopButton) {
-  shopButton.addEventListener("click", () => {
-    if (shopOverlay) {
-      shopOverlay.classList.remove("hidden");
-    }
-
-    if (shopCoins) {
-      shopCoins.textContent = player.coins;
+  document.addEventListener('keydown', (event) => {
+    if (event.code === 'Space') event.preventDefault();
+    keys[event.code] = true;
+    if (event.repeat) return;
+    if (event.code === 'Space') player.jumpRequested = true;
+    if (event.code === 'Digit1') switchWeapon(0);
+    if (event.code === 'Digit2') switchWeapon(1);
+    if (event.code === 'Digit3') switchWeapon(2);
+    if (event.code === 'Digit4') switchWeapon(3);
+    if (event.code === 'KeyR') doReload();
+    if (event.code === 'KeyE') handlePickup();
+    if (event.code === 'KeyH') useMedkit();
+    if (event.code === 'KeyB' && player.loot.boost > 0) {
+      player.loot.boost -= 1;
+      player.speedBoost = 1.5;
+      renderInventory();
+      showToast('Boost burst engaged');
+      setTimeout(() => player.speedBoost = 1, 2500);
     }
   });
-}
-
-if (closeShop) {
-  closeShop.addEventListener("click", () => {
-    if (shopOverlay) {
-      shopOverlay.classList.add("hidden");
-    }
-  });
-}
-
-document.querySelectorAll("[data-upgrade]").forEach(button => {
-  button.addEventListener("click", () => {
-    const type = button.dataset.upgrade;
-    const price = shopPrices[type];
-
-    if (player.coins < price) {
-      showMessage("ENOUGH COINS NAHI HAIN");
+  document.addEventListener('keyup', (event) => { keys[event.code] = false; });
+  window.addEventListener('pointermove', (event) => {
+    if (event.pointerId === joystickPointer) {
+      const bounds = document.getElementById('moveJoystick').getBoundingClientRect();
+      const radius = bounds.width * 0.31;
+      const dx = event.clientX - (bounds.left + bounds.width / 2);
+      const dy = event.clientY - (bounds.top + bounds.height / 2);
+      const length = Math.hypot(dx, dy);
+      const scale = length > radius ? radius / length : 1;
+      const thumb = document.getElementById('joystickThumb');
+      thumb.style.left = `calc(50% + ${dx * scale}px)`;
+      thumb.style.top = `calc(50% + ${dy * scale}px)`;
+      joystick.x = dx * scale / radius;
+      joystick.y = dy * scale / radius;
       return;
     }
-
-    player.coins -= price;
-    upgrades[type]++;
-    shopPrices[type] += 50;
-
-    if (type === "health") {
-      player.maxHealth += 20;
-      player.health = player.maxHealth;
-    }
-
-    if (type === "damage") {
-      player.damage += 4;
-    }
-
-    if (type === "speed") {
-      player.speed += 15;
-    }
-
-    if (type === "special") {
-      player.specialEnergy = 100;
-    }
-
-    saveGame();
-    saveUpgrades();
-    updateHud();
-
-    showMessage("UPGRADE SUCCESSFUL!");
-    playSound(700, .12);
-  });
-});
-
-document.querySelectorAll("[data-skin]").forEach(button => {
-  button.addEventListener("click", () => {
-    const skinColor =
-      button.dataset.skin === "gold"
-        ? 0xffcc4d
-        : 0x4cc9f0;
-
-    const price = skinColor === 0xffcc4d ? 500 : 750;
-
-    if (player.coins < price) {
-      showMessage("ENOUGH COINS NAHI HAIN");
+    if (event.pointerId === lookPointer && lookPosition) {
+      rotateCamera(event.clientX - lookPosition.x, event.clientY - lookPosition.y);
+      lookPosition = { x: event.clientX, y: event.clientY };
+      pointer.set(0, 0);
       return;
     }
-
-    player.coins -= price;
-
-    if (window.setPlayerSkin) {
-      window.setPlayerSkin(skinColor);
-    }
-
-    saveGame();
-    updateHud();
-
-    showMessage("SKIN UNLOCKED!");
-    playSound(800, .15);
-  });
-});
-
-document.querySelectorAll("[data-pet]").forEach(button => {
-  button.addEventListener("click", () => {
-    const price = 300;
-
-    if (player.coins < price) {
-      showMessage("ENOUGH COINS NAHI HAIN");
-      return;
-    }
-
-    player.coins -= price;
-    player.pet.level++;
-    player.pet.coinRange = 120 + (player.pet.level - 1) * 30;
-
-    saveGame();
-    updateHud();
-
-    showMessage(`PET LEVEL ${player.pet.level}!`, 1.5);
-    playSound(760, .15);
-  });
-});
-
-// Phase 14: Pet type switch
-document.querySelectorAll("[data-pet-type]").forEach(button => {
-  button.addEventListener("click", () => {
-    const type = button.dataset.petType;
-    const price = type === "dragon" ? 1000 : type === "cat" ? 600 : 0;
-
-    if (player.coins < price) {
-      showMessage("ENOUGH COINS NAHI HAIN");
-      return;
-    }
-
-    player.coins -= price;
-    player.pet.type = type;
-
-    saveGame();
-    updateHud();
-
-    showMessage(`${type.toUpperCase()} PET SELECTED!`, 1.5);
-    playSound(760, .15);
-  });
-});
-
-// Phase 20: Settings
-if (settingsButton) {
-  settingsButton.addEventListener("click", () => {
-    settingsOverlay.classList.remove("hidden");
-  });
-}
-
-if (closeSettings) {
-  closeSettings.addEventListener("click", () => {
-    settingsOverlay.classList.add("hidden");
-  });
-}
-
-if (musicToggle) {
-  musicToggle.addEventListener("click", () => {
-    musicEnabled = !musicEnabled;
-    musicToggle.textContent = musicEnabled ? "ON" : "OFF";
-    musicToggle.classList.toggle("active", musicEnabled);
-
-    if (!musicEnabled) {
-      stopBackgroundMusic();
-    } else if (state.running) {
-      startBackgroundMusic();
+    if (event.pointerType === 'mouse') {
+      pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      if (event.buttons === 2) rotateCamera(event.movementX, event.movementY);
     }
   });
-}
-
-if (sfxToggle) {
-  sfxToggle.addEventListener("click", () => {
-    sfxEnabled = !sfxEnabled;
-    sfxToggle.textContent = sfxEnabled ? "ON" : "OFF";
-    sfxToggle.classList.toggle("active", sfxEnabled);
-    state.muted = !sfxEnabled;
-  });
-}
-
-if (fullscreenButton) {
-  fullscreenButton.addEventListener("click", async () => {
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else {
-        const gameShell = document.querySelector(".game-shell");
-
-        if (!gameShell.requestFullscreen) {
-          showMessage("FULLSCREEN IS NOT SUPPORTED");
-          return;
-        }
-
-        await gameShell.requestFullscreen();
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'touch') {
+      if (event.clientX > window.innerWidth * 0.48) {
+        lookPointer = event.pointerId;
+        lookPosition = { x: event.clientX, y: event.clientY };
+        pointer.set(0, 0);
       }
-    } catch (error) {
-      console.error("Fullscreen error:", error);
-      showMessage("COULD NOT OPEN FULLSCREEN");
+      return;
+    }
+    if (event.button === 0) { player.firing = true; shoot(); }
+    if (event.button === 2) {
+      event.preventDefault();
+      player.aiming = true;
     }
   });
-
-  document.addEventListener("fullscreenchange", () => {
-    const isFullscreen = Boolean(document.fullscreenElement);
-    fullscreenButton.textContent = isFullscreen ? "⤢" : "⛶";
-    fullscreenButton.title = isFullscreen ? "Exit Fullscreen" : "Toggle Fullscreen";
-    fullscreenButton.setAttribute(
-      "aria-label",
-      isFullscreen ? "Exit fullscreen" : "Toggle fullscreen"
-    );
-  });
-}
-
-// Phase 20: Loading
-function simulateLoading() {
-  let progress = 0;
-
-  const interval = setInterval(() => {
-    progress += Math.random() * 20;
-
-    if (progress >= 100) {
-      progress = 100;
-      clearInterval(interval);
-
-      loadingText.textContent = "READY!";
-
-      setTimeout(() => {
-        loadingScreen.classList.add("hidden");
-      }, 500);
+  window.addEventListener('pointerup', (event) => {
+    if (event.pointerId === joystickPointer) {
+      joystickPointer = null;
+      joystick.x = 0;
+      joystick.y = 0;
+      const thumb = document.getElementById('joystickThumb');
+      thumb.style.left = '50%';
+      thumb.style.top = '50%';
     }
-
-    loadingFill.style.width = `${progress}%`;
-  }, 200);
-}
-
-simulateLoading();
-
-// Phase 11: Start checks
-checkDailyReward();
-
-setInterval(() => {
-  if (state.running) {
-    checkAchievements();
-  }
-}, 2000);
-
-loadGame();
-loadUpgrades();
-updateHud();
-
-const saveReelButton = document.getElementById("saveReelButton");
-
-if (saveReelButton) {
-  saveReelButton.addEventListener("click", () => {
-    if (window.startReelRecording) {
-      window.startReelRecording();
-      showMessage("REEL RECORDING STARTED!", 1.5);
+    if (event.pointerId === lookPointer) {
+      lookPointer = null;
+      lookPosition = null;
     }
+    if (event.pointerId === firePointer) {
+      firePointer = null;
+      player.firing = false;
+    }
+    if (event.pointerType === 'mouse' && event.button === 0) player.firing = false;
+    if (event.pointerType === 'mouse' && event.button === 2) player.aiming = false;
   });
+  window.addEventListener('pointercancel', () => {
+    joystickPointer = null;
+    lookPointer = null;
+    firePointer = null;
+    lookPosition = null;
+    joystick.x = 0;
+    joystick.y = 0;
+    player.firing = false;
+    player.aiming = false;
+    document.getElementById('joystickThumb').style.left = '50%';
+    document.getElementById('joystickThumb').style.top = '50%';
+  });
+  const joystickElement = document.getElementById('moveJoystick');
+  joystickElement.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    joystickPointer = event.pointerId;
+  });
+  document.getElementById('fireButton').addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    firePointer = event.pointerId;
+    player.firing = true;
+    shoot();
+  });
+  document.getElementById('fireButton').addEventListener('pointerup', () => { player.firing = false; });
+  document.getElementById('fireButton').addEventListener('pointercancel', () => { player.firing = false; });
+  document.getElementById('jumpButton').addEventListener('pointerdown', (event) => { event.preventDefault(); player.jumpRequested = true; });
+  document.getElementById('reloadButton').addEventListener('pointerdown', (event) => { event.preventDefault(); doReload(); });
+  document.getElementById('pickupButton').addEventListener('pointerdown', (event) => { event.preventDefault(); handlePickup(); });
+  document.getElementById('healButton').addEventListener('pointerdown', (event) => { event.preventDefault(); useMedkit(); });
+  document.getElementById('weaponButton').addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    switchWeapon((player.weaponIndex + 1) % player.weapons.length);
+  });
+  document.getElementById('aimButton').addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    player.aiming = !player.aiming;
+    event.currentTarget.classList.toggle('active', player.aiming);
+  });
+  hud.toggle.addEventListener('click', () => setInventoryVisible(true));
+  hud.close.addEventListener('click', () => setInventoryVisible(false));
+  window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
 }
 
-requestAnimationFrame(gameLoop);
+function init() {
+  buildWorld();
+  createPlayer();
+  createEnemy(-18, -38, 0x9abf7d);
+  createEnemy(24, -20, 0x8ea584);
+  createEnemy(-42, 24, 0xc68c6b);
+  createEnemy(52, 28, 0x93a7b7);
+  createEnemy(-52, -54, 0x7b9fa2);
+  createEnemy(14, 54, 0x8d8278);
+  createEnemy(64, -6, 0x7fa57f);
+  createEnemy(-66, 62, 0x7c9d5d);
+  player.pos.set(0, 0, 18); player.group.position.copy(player.pos); camera.position.set(0, 4.2, 10); camera.lookAt(0, 1.5, 12);
+  renderInventory(); uiUpdate(); setupInput(); animate();
+}
+
+init();
