@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d1117" />
+  <title>SHUBHAM JI — Adventure Arena</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Phase 20: Loading Screen -->
+  <div class="loading-screen" id="loadingScreen">
+    <div class="loading-content">
+      <h1>SHUBHAM<span>JI</span></h1>
+      <div class="loading-bar">
+        <div class="loading-fill" id="loadingFill"></div>
+      </div>
+      <p id="loadingText">LOADING...</p>
+    </div>
+  </div>
+
+  <main class="game-shell">
+    <header class="topbar">
+      <a class="brand" href="#">
+        <span class="brand-mark">S</span> SHUBHAM JI
+      </a>
+
+      <div class="match-info">
+        <span class="stat">
+          <span class="stat-label">LEVEL</span>
+          <strong id="levelValue">1</strong>
+        </span>
+
+        <span class="stat">
+          <span class="stat-label">AMMO</span>
+          <strong id="ammoValue">12/48</strong>
+        </span>
+
+        <span class="stat">
+          <span class="stat-label">COINS</span>
+          <strong id="coinValue">0</strong>
+        </span>
+
+        <span class="stat">
+          <span class="stat-label">ENEMIES</span>
+          <strong id="enemyValue">0</strong>
+        </span>
+      </div>
+
+      <div class="topbar-buttons">
+        <button id="shopButton" class="icon-button" title="Upgrade Shop">🛒</button>
+        <button id="leaderboardButton" class="icon-button" title="Leaderboard">🏆</button>
+        <button id="settingsButton" class="icon-button" title="Settings">⚙️</button>
+        <button id="soundBtn" class="icon-button" title="Sound">♪</button>
+      </div>
+    </header>
+
+    <section class="arena">
+      <canvas id="gameCanvas" width="1000" height="620"></canvas>
+
+      <div class="game-overlay" id="overlay">
+        <div class="intro-card">
+          <div class="eyebrow">
+            <span class="live-dot"></span> ADVENTURE · FIGHT · WIN
+          </div>
+
+          <h1>SHUBHAM<br /><span>JI</span></h1>
+
+          <p>
+            Enemies ko harao, coins collect karo, pet ko upgrade karo,
+            power-ups lo aur boss ko defeat karo.
+          </p>
+
+          <button id="startBtn" class="primary-button">
+            START GAME <span>→</span>
+          </button>
+
+          <div class="control-hint">
+            <kbd>WASD</kbd> P1 Move
+            <kbd>J</kbd> Punch
+            <kbd>K</kbd> Kick
+            <kbd>L</kbd> Block
+            <kbd>SHIFT</kbd> Dodge
+            <kbd>SPACE</kbd> Special
+            <kbd>F</kbd> Fire
+            <kbd>R</kbd> Reload
+            <kbd>Q</kbd> Gun
+            <kbd>ARROWS</kbd> P2 Move
+            <kbd>1-8</kbd> P2 Actions
+          </div>
+        </div>
+      </div>
+
+      <div class="shop-overlay hidden" id="shopOverlay">
+        <div class="shop-card">
+          <div class="shop-header">
+            <h2>UPGRADE SHOP</h2>
+            <button id="closeShop" class="icon-button">✕</button>
+          </div>
+
+          <p class="shop-coins">
+            COINS: <b id="shopCoins">0</b>
+          </p>
+
+          <div class="shop-items">
+            <button class="shop-item" data-upgrade="health">
+              <span>❤️ HEALTH</span>
+              <b id="healthPrice">100</b>
+            </button>
+
+            <button class="shop-item" data-upgrade="damage">
+              <span>⚔️ DAMAGE</span>
+              <b id="damagePrice">150</b>
+            </button>
+
+            <button class="shop-item" data-upgrade="speed">
+              <span>👟 SPEED</span>
+              <b id="speedPrice">120</b>
+            </button>
+
+            <button class="shop-item" data-upgrade="special">
+              <span>⚡ SPECIAL POWER</span>
+              <b id="specialPrice">200</b>
+            </button>
+
+            <button class="shop-item" data-skin="gold">
+              <span>👑 GOLD SKIN</span>
+              <b>500</b>
+            </button>
+
+            <button class="shop-item" data-skin="blue">
+              <span>🔵 BLUE SKIN</span>
+              <b>750</b>
+            </button>
+
+            <button class="shop-item" data-pet="upgrade">
+              <span>🐾 PET UPGRADE</span>
+              <b>300</b>
+            </button>
+
+            <button class="shop-item" data-pet-type="dog">
+              <span>🐶 DOG PET</span>
+              <b>FREE</b>
+            </button>
+
+            <button class="shop-item" data-pet-type="cat">
+              <span>🐱 CAT PET</span>
+              <b>600</b>
+            </button>
+
+            <button class="shop-item" data-pet-type="dragon">
+              <span>🐲 DRAGON PET</span>
+              <b>1000</b>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="combat-hud">
+        <div class="health-panel">
+          <div class="health-heading">
+            <span>SHUBHAM JI</span>
+            <strong id="healthValue">100</strong>
+          </div>
+
+          <div class="health-track">
+            <div id="healthBar" class="health-fill"></div>
+          </div>
+
+          <div class="stamina-track">
+            <div id="specialBar" class="special-fill"></div>
+          </div>
+
+          <div class="bottom-stats">
+            <span>COMBO <b id="comboValue">0</b></span>
+            <span>BLOCK <b id="blockValue">READY</b></span>
+            <span>DODGE <b id="dodgeValue">READY</b></span>
+          </div>
+        </div>
+
+        <div class="weapon-panel">
+          <div class="weapon-icon">⚔</div>
+
+          <div class="weapon-info">
+            <strong id="attackName">FIGHTER</strong>
+            <span id="attackInfo">GUN · PUNCH · KICK · PET</span>
+          </div>
+
+          <div class="ammo">
+            <strong id="coinHud">0</strong>
+            <span>COINS</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="boss-bar" id="bossBar">
+        <span id="bossName">BOSS</span>
+
+        <div class="boss-track">
+          <div id="bossHealth" class="boss-fill"></div>
+        </div>
+      </div>
+
+      <div class="action-message" id="actionMessage"></div>
+
+      <!-- Phase 11: Daily Reward Popup -->
+      <div class="reward-popup hidden" id="rewardPopup">
+        <div class="reward-card">
+          <span class="reward-eyebrow">DAILY REWARD</span>
+          <h3 id="rewardTitle">DAY 1</h3>
+          <p id="rewardText">+50 COINS</p>
+          <button id="claimReward" class="primary-button">CLAIM →</button>
+        </div>
+      </div>
+
+      <!-- Phase 11: Achievement Popup -->
+      <div class="achievement-popup hidden" id="achievementPopup">
+        <span id="achievementText">ACHIEVEMENT UNLOCKED!</span>
+      </div>
+
+      <!-- Phase 12: Leaderboard -->
+      <div class="leaderboard-overlay hidden" id="leaderboardOverlay">
+        <div class="leaderboard-card">
+          <div class="leaderboard-header">
+            <h2>🏆 LEADERBOARD</h2>
+            <button id="closeLeaderboard" class="icon-button">✕</button>
+          </div>
+
+          <p class="leaderboard-sub">TOP 5 SCORES</p>
+
+          <div class="leaderboard-list" id="leaderboardList"></div>
+        </div>
+      </div>
+
+      <!-- Phase 20: Settings + Credits -->
+      <div class="settings-overlay hidden" id="settingsOverlay">
+        <div class="settings-card">
+          <div class="settings-header">
+            <h2>⚙️ SETTINGS</h2>
+            <button id="closeSettings" class="icon-button">✕</button>
+          </div>
+
+          <div class="setting-row">
+            <span>MUSIC</span>
+            <button id="musicToggle" class="toggle-button active">ON</button>
+          </div>
+
+          <div class="setting-row">
+            <span>SFX</span>
+            <button id="sfxToggle" class="toggle-button active">ON</button>
+          </div>
+
+          <div class="setting-row">
+            <span>SENSITIVITY</span>
+            <input type="range" id="sensitivity" min="50" max="200" value="100" />
+          </div>
+
+          <div class="credits">
+            <h3>CREDITS</h3>
+            <p>SHUBHAM JI — ADVENTURE ARENA</p>
+            <p>Made with Three.js + Vanilla JS</p>
+            <p>Phase 1–20 Complete 🎉</p>
+          </div>
+        </div>
+      </div>
+
+      <button id="saveReelButton" class="reel-button hidden">
+        ⬇ SAVE REEL
+      </button>
+
+      <div class="mobile-controls">
+        <div class="dpad">
+          <button data-move="up">▲</button>
+          <button data-move="left">◀</button>
+          <button data-move="down">▼</button>
+          <button data-move="right">▶</button>
+        </div>
+
+        <div class="mobile-actions">
+          <button id="blockButton" class="action-button">BLOCK</button>
+          <button id="dodgeButton" class="action-button">DODGE</button>
+          <button id="kickButton" class="action-button">KICK</button>
+          <button id="specialButton" class="action-button">SPECIAL</button>
+          <button id="punchButton" class="fire-button">PUNCH</button>
+          <button id="reloadGunButton" class="action-button">RELOAD</button>
+          <button id="switchGunButton" class="action-button">GUN</button>
+          <button id="fireGunButton" class="gun-button">FIRE</button>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>SHUBHAM JI <i>—</i> ADVENTURE ARENA</span>
+      <span>FIGHT <b>·</b> SURVIVE <b>·</b> WIN</span>
+    </footer>
+  </main>
+
+  <script src="script.js"></script>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.172.0/build/three.module.js"
+      }
+    }
+  </script>
+
+  <script type="module" src="game3d.js"></script>
+</body>
+</html>

@@ -1,0 +1,1053 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=DM+Sans:wght@400;500;700&display=swap');
+
+:root {
+  color-scheme: dark;
+  --bg: #0d1117;
+  --panel: #151b23;
+  --muted: #93a1b0;
+  --text: #f2f5f8;
+  --gold: #ffcc4d;
+  --red: #ff5a5a;
+  --blue: #4cc9f0;
+  --green: #7ee787;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: radial-gradient(circle at 50% 0%, #1b2430, #0d1117 60%);
+  color: var(--text);
+  font-family: "DM Sans", Arial, sans-serif;
+}
+
+button {
+  font: inherit;
+}
+
+.game-shell {
+  width: min(1120px, 100%);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+  text-decoration: none;
+  font: 900 20px "Barlow Condensed", sans-serif;
+  letter-spacing: .12em;
+}
+
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--gold), #ff9f1c);
+  color: #191100;
+  border-radius: 8px;
+  font-size: 18px;
+}
+
+.match-info {
+  display: flex;
+  gap: 22px;
+}
+
+.stat {
+  display: grid;
+  gap: 2px;
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .16em;
+}
+
+.stat strong {
+  font: 800 20px "Barlow Condensed", sans-serif;
+  color: var(--gold);
+}
+
+.topbar-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #333d49;
+  border-radius: 50%;
+  background: #1a222c;
+  color: white;
+  cursor: pointer;
+}
+
+.arena {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #38424e;
+  border-radius: 14px;
+  background: #101820;
+  box-shadow: 0 25px 80px #0009;
+}
+
+#gameCanvas {
+  display: block;
+  width: 100%;
+  height: 62vh;
+  min-height: 380px;
+  touch-action: none;
+}
+
+.game-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: linear-gradient(120deg, rgba(6, 10, 15, .92), rgba(6, 10, 15, .55));
+  z-index: 15;
+}
+
+.game-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.intro-card {
+  width: min(520px, 100%);
+  text-align: left;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #c8d3dd;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .2em;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 14px var(--gold);
+}
+
+h1 {
+  margin: 16px 0 10px;
+  font: 900 clamp(54px, 10vw, 96px) / .85 "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+}
+
+h1 span {
+  color: var(--gold);
+  text-shadow: 0 0 25px #ffcc4d66;
+}
+
+.intro-card p {
+  max-width: 360px;
+  margin: 14px 0 22px;
+  color: #c3ccd6;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.primary-button {
+  min-width: 190px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--gold), #ff9f1c);
+  color: #191100;
+  font: 800 14px "Barlow Condensed", sans-serif;
+  letter-spacing: .12em;
+  cursor: pointer;
+}
+
+.control-hint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 18px;
+  color: #b9c4cf;
+  font-size: 9px;
+}
+
+kbd {
+  padding: 4px 6px;
+  border: 1px solid #6d7a88;
+  border-radius: 4px;
+  font-size: 8px;
+}
+
+.combat-hud {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.health-panel,
+.weapon-panel {
+  padding: 10px 12px;
+  border: 1px solid #ffffff1f;
+  border-radius: 8px;
+  background: rgba(13, 18, 24, .86);
+  backdrop-filter: blur(8px);
+}
+
+.health-heading {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+
+.health-heading strong {
+  color: var(--gold);
+  font: 800 16px "Barlow Condensed", sans-serif;
+}
+
+.health-track {
+  height: 6px;
+  margin-top: 6px;
+  background: #333d49;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.health-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #7ee787, var(--gold));
+  transition: width .2s;
+}
+
+.stamina-track {
+  height: 4px;
+  margin-top: 5px;
+  background: #333d49;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.special-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--blue);
+  transition: width .2s;
+}
+
+.bottom-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 7px;
+  color: #aab6c2;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.bottom-stats b {
+  color: white;
+}
+
+.weapon-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 220px;
+}
+
+.weapon-icon {
+  color: var(--gold);
+  font-size: 22px;
+}
+
+.weapon-info strong {
+  display: block;
+  font: 800 16px "Barlow Condensed", sans-serif;
+}
+
+.weapon-info span {
+  color: #9aa7b4;
+  font-size: 8px;
+  letter-spacing: .12em;
+}
+
+.ammo {
+  margin-left: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.ammo strong {
+  font: 800 24px "Barlow Condensed", sans-serif;
+  color: var(--gold);
+}
+
+.ammo span {
+  color: #9aa7b4;
+  font-size: 10px;
+}
+
+.boss-bar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, 70%);
+  display: none;
+  text-align: center;
+  z-index: 10;
+}
+
+.boss-bar.active {
+  display: block;
+}
+
+.boss-bar span {
+  color: var(--red);
+  font: 800 12px "Barlow Condensed", sans-serif;
+  letter-spacing: .2em;
+}
+
+.boss-track {
+  height: 8px;
+  margin-top: 5px;
+  background: #2b1a1a;
+  border: 1px solid #ff5a5a55;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.boss-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, var(--red), #ff9f1c);
+  transition: width .2s;
+}
+
+.action-message {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font: 900 18px "Barlow Condensed", sans-serif;
+  letter-spacing: .18em;
+  text-shadow: 0 3px 10px black;
+  pointer-events: none;
+  z-index: 12;
+}
+
+.reel-button {
+  position: absolute;
+  right: 16px;
+  top: 70px;
+  padding: 12px 18px;
+  border: 2px solid var(--gold);
+  border-radius: 10px;
+  background: #b8860bcc;
+  color: white;
+  font: 800 13px "Barlow Condensed", sans-serif;
+  letter-spacing: .12em;
+  cursor: pointer;
+  z-index: 25;
+}
+
+.reel-button.hidden {
+  display: none;
+}
+
+.reel-button:active {
+  transform: scale(.96);
+}
+
+.victory-text {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 24;
+}
+
+.victory-text span {
+  font: 900 clamp(38px, 9vw, 80px) "Barlow Condensed", sans-serif;
+  color: var(--gold);
+  text-shadow: 0 0 30px #ffcc4d, 0 6px 20px black;
+  letter-spacing: .08em;
+  animation: victoryPop .8s ease-out;
+}
+
+@keyframes victoryPop {
+  0% {
+    transform: scale(.4);
+    opacity: 0;
+  }
+
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.mobile-controls {
+  display: none;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 12px;
+  color: #7b8794;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+
+.footer i {
+  color: var(--gold);
+  font-style: normal;
+}
+
+.footer b {
+  color: var(--gold);
+  padding: 0 4px;
+}
+
+.shop-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(5, 9, 14, .88);
+  backdrop-filter: blur(6px);
+  z-index: 30;
+}
+
+.shop-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.shop-card {
+  width: min(430px, 100%);
+  padding: 18px;
+  border: 1px solid #ffffff22;
+  border-radius: 14px;
+  background: #121a22;
+  box-shadow: 0 20px 60px #000a;
+}
+
+.shop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.shop-header h2 {
+  margin: 0;
+  font: 900 24px "Barlow Condensed", sans-serif;
+  letter-spacing: .1em;
+  color: var(--gold);
+}
+
+.shop-coins {
+  margin: 10px 0 14px;
+  color: #b9c4cf;
+  font-size: 12px;
+}
+
+.shop-coins b {
+  color: var(--gold);
+  font-size: 16px;
+}
+
+.shop-items {
+  display: grid;
+  gap: 8px;
+}
+
+.shop-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid #ffffff22;
+  border-radius: 8px;
+  background: #18222c;
+  color: white;
+  cursor: pointer;
+  font: 700 13px "DM Sans", sans-serif;
+}
+
+.shop-item b {
+  color: var(--gold);
+}
+
+.shop-item:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+/* Phase 14: Pet shop items */
+.shop-item[data-pet] {
+  border-color: var(--green);
+  background: #16281c;
+}
+
+.shop-item[data-pet] b {
+  color: var(--green);
+}
+
+.shop-item[data-pet-type] {
+  border-color: #ffffff33;
+}
+
+.shop-item[data-pet-type="dragon"] {
+  border-color: var(--red);
+}
+
+.shop-item[data-pet-type="dragon"] b {
+  color: var(--red);
+}
+
+/* Gun buttons */
+.gun-button {
+  border: 2px solid var(--blue);
+  border-radius: 50%;
+  background: #1f4e66cc;
+  color: white;
+  font: 800 12px "Barlow Condensed", sans-serif;
+  touch-action: none;
+}
+
+#fireGunButton {
+  width: 70px;
+  height: 70px;
+}
+
+/* Phase 11: Daily Reward Popup */
+.reward-popup {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 9, 14, .88);
+  backdrop-filter: blur(6px);
+  z-index: 40;
+}
+
+.reward-popup.hidden,
+.achievement-popup.hidden {
+  display: none;
+}
+
+.reward-card {
+  width: min(340px, 90%);
+  padding: 22px;
+  border: 2px solid var(--gold);
+  border-radius: 14px;
+  background: #121a22;
+  text-align: center;
+  box-shadow: 0 20px 60px #000a;
+}
+
+.reward-eyebrow {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .2em;
+}
+
+.reward-card h3 {
+  margin: 10px 0 6px;
+  font: 900 34px "Barlow Condensed", sans-serif;
+  color: var(--gold);
+}
+
+.reward-card p {
+  margin: 0 0 16px;
+  color: #c3ccd6;
+  font-size: 14px;
+}
+
+.achievement-popup {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  border: 2px solid var(--green);
+  border-radius: 10px;
+  background: #16281ccc;
+  color: var(--green);
+  font: 800 14px "Barlow Condensed", sans-serif;
+  letter-spacing: .14em;
+  z-index: 45;
+  animation: achievementPop .5s ease-out;
+}
+
+@keyframes achievementPop {
+  0% {
+    transform: translate(-50%, -20px);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+/* Phase 12: Leaderboard */
+.leaderboard-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(5, 9, 14, .88);
+  backdrop-filter: blur(6px);
+  z-index: 50;
+}
+
+.leaderboard-overlay.hidden {
+  display: none;
+}
+
+.leaderboard-card {
+  width: min(400px, 95%);
+  padding: 18px;
+  border: 1px solid #ffffff22;
+  border-radius: 14px;
+  background: #121a22;
+  box-shadow: 0 20px 60px #000a;
+}
+
+.leaderboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.leaderboard-header h2 {
+  margin: 0;
+  font: 900 24px "Barlow Condensed", sans-serif;
+  letter-spacing: .1em;
+  color: var(--gold);
+}
+
+.leaderboard-sub {
+  margin: 8px 0 14px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .18em;
+}
+
+.leaderboard-list {
+  display: grid;
+  gap: 8px;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid #ffffff22;
+  border-radius: 8px;
+  background: #18222c;
+  font: 700 13px "DM Sans", sans-serif;
+}
+
+.leaderboard-row .rank {
+  color: var(--gold);
+  font: 800 16px "Barlow Condensed", sans-serif;
+  width: 28px;
+}
+
+.leaderboard-row .score {
+  color: var(--gold);
+  font: 800 16px "Barlow Condensed", sans-serif;
+}
+
+.leaderboard-empty {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* Phase 20: Loading Screen */
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #0d1117;
+  z-index: 100;
+  transition: opacity .5s;
+}
+
+.loading-screen.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-content {
+  text-align: center;
+}
+
+.loading-content h1 {
+  font: 900 60px "Barlow Condensed", sans-serif;
+  color: white;
+}
+
+.loading-content h1 span {
+  color: var(--gold);
+}
+
+.loading-bar {
+  width: 280px;
+  height: 6px;
+  margin: 20px auto;
+  background: #333d49;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.loading-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--gold), #ff9f1c);
+  transition: width .3s;
+}
+
+.loading-content p {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: .2em;
+}
+
+/* Phase 20: Settings + Credits */
+.settings-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(5, 9, 14, .88);
+  backdrop-filter: blur(6px);
+  z-index: 60;
+}
+
+.settings-overlay.hidden {
+  display: none;
+}
+
+.settings-card {
+  width: min(380px, 95%);
+  padding: 18px;
+  border: 1px solid #ffffff22;
+  border-radius: 14px;
+  background: #121a22;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-header h2 {
+  margin: 0;
+  font: 900 22px "Barlow Condensed", sans-serif;
+  color: var(--gold);
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #ffffff1a;
+  font: 700 13px "DM Sans", sans-serif;
+}
+
+.toggle-button {
+  padding: 6px 16px;
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--gold);
+  font: 800 11px "Barlow Condensed", sans-serif;
+  cursor: pointer;
+}
+
+.toggle-button.active {
+  background: var(--gold);
+  color: #191100;
+}
+
+input[type="range"] {
+  width: 120px;
+  accent-color: var(--gold);
+}
+
+.credits {
+  margin-top: 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.credits h3 {
+  color: var(--gold);
+  font: 800 14px "Barlow Condensed", sans-serif;
+  letter-spacing: .14em;
+}
+
+@media (max-width: 700px) {
+  body {
+    padding: 8px;
+    align-items: start;
+  }
+
+  .topbar {
+    padding-bottom: 8px;
+  }
+
+  .brand {
+    font-size: 16px;
+  }
+
+  .match-info {
+    gap: 12px;
+  }
+
+  .stat strong {
+    font-size: 17px;
+  }
+
+  .combat-hud {
+    left: 6px;
+    right: 6px;
+    bottom: 6px;
+    gap: 5px;
+  }
+
+  .health-panel,
+  .weapon-panel {
+    padding: 6px 8px;
+    min-width: 0;
+  }
+
+  .health-panel {
+    width: 48%;
+  }
+
+  .weapon-panel {
+    width: 51%;
+  }
+
+  .weapon-info strong {
+    font-size: 13px;
+  }
+
+  .ammo strong {
+    font-size: 19px;
+  }
+
+  .bottom-stats {
+    font-size: 6px;
+  }
+
+  .mobile-controls {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 16%;
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    padding: 0 4%;
+    pointer-events: none;
+    z-index: 14;
+  }
+
+  .dpad {
+    display: grid;
+    grid-template: repeat(2, 52px) / repeat(3, 52px);
+    gap: 5px;
+    pointer-events: auto;
+  }
+
+  .dpad button {
+    border: 1px solid #ffffff44;
+    border-radius: 12px;
+    background: #111a22cc;
+    color: white;
+    font-size: 17px;
+    touch-action: none;
+  }
+
+  .dpad button[data-move="up"] {
+    grid-area: 1 / 2;
+  }
+
+  .dpad button[data-move="left"] {
+    grid-area: 2 / 1;
+  }
+
+  .dpad button[data-move="down"] {
+    grid-area: 2 / 2;
+  }
+
+  .dpad button[data-move="right"] {
+    grid-area: 2 / 3;
+  }
+
+  .mobile-actions {
+    display: grid;
+    grid-template: repeat(4, 50px) / 70px 78px;
+    gap: 6px;
+    pointer-events: auto;
+  }
+
+  .action-button,
+  .fire-button {
+    border: 1px solid #ffffff44;
+    border-radius: 12px;
+    background: #111a22cc;
+    color: white;
+    font: 800 11px "Barlow Condensed", sans-serif;
+    letter-spacing: .08em;
+    touch-action: none;
+  }
+
+  #blockButton {
+    grid-area: 1 / 1;
+  }
+
+  #dodgeButton {
+    grid-area: 2 / 1;
+  }
+
+  #kickButton {
+    grid-area: 3 / 1;
+  }
+
+  #specialButton {
+    grid-area: 2 / 2;
+  }
+
+  .fire-button {
+    grid-area: 1 / 2;
+    width: 82px;
+    height: 82px;
+    justify-self: center;
+    align-self: center;
+    border-radius: 50%;
+    border: 2px solid var(--gold);
+    background: #b8860bcc;
+    font-size: 13px;
+  }
+
+  #fireGunButton {
+    grid-area: 4 / 2;
+    width: 70px;
+    height: 70px;
+    justify-self: center;
+  }
+
+  #reloadGunButton {
+    grid-area: 4 / 1;
+  }
+
+  #switchGunButton {
+    grid-area: 3 / 2;
+  }
+
+  .reel-button {
+    right: 10px;
+    top: 60px;
+    padding: 10px 14px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 400px) {
+  .footer span:last-child {
+    display: none;
+  }
+
+  .match-info {
+    gap: 8px;
+  }
+
+  .dpad {
+    grid-template: repeat(2, 46px) / repeat(3, 46px);
+  }
+
+  .mobile-actions {
+    grid-template: repeat(4, 48px) / 64px 72px;
+  }
+
+  .fire-button {
+    width: 72px;
+    height: 72px;
+  }
+
+  #fireGunButton {
+    width: 64px;
+    height: 64px;
+  }
+}
