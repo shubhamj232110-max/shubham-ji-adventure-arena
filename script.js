@@ -48,8 +48,17 @@ const closeSettings = document.getElementById("closeSettings");
 const musicToggle = document.getElementById("musicToggle");
 const sfxToggle = document.getElementById("sfxToggle");
 const sensitivity = document.getElementById("sensitivity");
+const fullscreenButton = document.getElementById("fullscreenButton");
+const zoneStatus = document.getElementById("zoneStatus");
 
 const WORLD = { width: 4000, height: 3000 };
+const SAFE_ZONE = {
+  initialRadius: 1650,
+  finalRadius: 260,
+  delay: 25,
+  shrinkDuration: 70,
+  damage: 8
+};
 const keys = new Set();
 const player2Keys = new Set();
 
@@ -147,7 +156,11 @@ const state = {
   weaponCrates: [],
   powerups: [],
   activePowerup: null,
-  powerupTimer: 0
+  powerupTimer: 0,
+  mobileFiring: false,
+  zone: null,
+  zoneDamageTimer: 0,
+  zoneWarningTimer: 0
 };
 
 const shopPrices = {
@@ -587,6 +600,62 @@ function showMessage(text, time = 1.2) {
   state.messageTimer = time;
 }
 
+function updateSafeZone(dt) {
+  if (!state.zone) return;
+
+  const zone = state.zone;
+  zone.elapsed += dt;
+
+  const shrinkProgress = Math.min(
+    1,
+    Math.max(0, (zone.elapsed - SAFE_ZONE.delay) / SAFE_ZONE.shrinkDuration)
+  );
+
+  zone.radius =
+    SAFE_ZONE.initialRadius -
+    (SAFE_ZONE.initialRadius - SAFE_ZONE.finalRadius) * shrinkProgress;
+
+  const secondsLeft = Math.ceil(
+    zone.elapsed < SAFE_ZONE.delay
+      ? SAFE_ZONE.delay - zone.elapsed
+      : SAFE_ZONE.shrinkDuration * (1 - shrinkProgress)
+  );
+
+  const status = zone.elapsed < SAFE_ZONE.delay
+    ? `SAFE ZONE · SHRINK IN ${secondsLeft}s`
+    : shrinkProgress < 1
+      ? `ZONE SHRINKING · ${secondsLeft}s`
+      : "FINAL ZONE";
+
+  if (zoneStatus.textContent !== status) {
+    zoneStatus.textContent = status;
+  }
+
+  const outsideZone =
+    Math.hypot(player.x - zone.x, player.y - zone.y) > zone.radius;
+
+  zoneStatus.classList.toggle("danger", outsideZone);
+
+  if (!outsideZone) {
+    state.zoneDamageTimer = 0;
+    state.zoneWarningTimer = 0;
+    return;
+  }
+
+  state.zoneDamageTimer -= dt;
+  state.zoneWarningTimer -= dt;
+
+  if (state.zoneWarningTimer <= 0) {
+    showMessage("OUTSIDE SAFE ZONE!");
+    state.zoneWarningTimer = 2.5;
+  }
+
+  if (state.zoneDamageTimer <= 0) {
+    damagePlayer(SAFE_ZONE.damage);
+    state.zoneDamageTimer = 1;
+  }
+}
+
 function playSound(frequency, duration = .08, type = "square") {
   if (state.muted || !sfxEnabled) return;
 
@@ -732,6 +801,14 @@ function startLevel() {
 
   player.x = WORLD.width / 2;
   player.y = WORLD.height / 2;
+  state.zone = {
+    x: WORLD.width / 2,
+    y: WORLD.height / 2,
+    radius: SAFE_ZONE.initialRadius,
+    elapsed: 0
+  };
+  state.zoneDamageTimer = 0;
+  state.zoneWarningTimer = 0;
   player.health = player.maxHealth;
   player.combo = 0;
   player.specialEnergy = 0;
@@ -1133,6 +1210,7 @@ function damagePlayer(amount) {
 function finishGame(won) {
   state.running = false;
   state.ended = true;
+  state.mobileFiring = false;
 
   saveLeaderboardEntry();
 
@@ -1351,6 +1429,12 @@ function update(dt) {
     player.combo = 0;
   }
 
+  if (state.mobileFiring) {
+    shootGun();
+  }
+
+  updateSafeZone(dt);
+
   let dx =
     Number(keys.has("d")) -
     Number(keys.has("a"));
@@ -1370,7 +1454,9 @@ function update(dt) {
     const speed =
       (player.dodgeTime > 0
         ? player.speed * 2.6
-        : player.speed) * getPowerupSpeedMultiplier();
+        : player.speed) *
+      getPowerupSpeedMultiplier() *
+      (Number(sensitivity.value) / 100);
 
     player.x += dx * speed * dt;
     player.y += dy * speed * dt;
@@ -1798,8 +1884,16 @@ const fireGunButton = document.getElementById("fireGunButton");
 if (fireGunButton) {
   fireGunButton.addEventListener("pointerdown", event => {
     event.preventDefault();
+    fireGunButton.setPointerCapture(event.pointerId);
+    state.mobileFiring = true;
     shootGun();
   });
+
+  for (const name of ["pointerup", "pointercancel", "lostpointercapture"]) {
+    fireGunButton.addEventListener(name, () => {
+      state.mobileFiring = false;
+    });
+  }
 }
 
 const reloadGunButton = document.getElementById("reloadGunButton");
@@ -1997,6 +2091,38 @@ if (sfxToggle) {
     sfxToggle.textContent = sfxEnabled ? "ON" : "OFF";
     sfxToggle.classList.toggle("active", sfxEnabled);
     state.muted = !sfxEnabled;
+  });
+}
+
+if (fullscreenButton) {
+  fullscreenButton.addEventListener("click", async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        const gameShell = document.querySelector(".game-shell");
+
+        if (!gameShell.requestFullscreen) {
+          showMessage("FULLSCREEN IS NOT SUPPORTED");
+          return;
+        }
+
+        await gameShell.requestFullscreen();
+      }
+    } catch (error) {
+      console.error("Fullscreen error:", error);
+      showMessage("COULD NOT OPEN FULLSCREEN");
+    }
+  });
+
+  document.addEventListener("fullscreenchange", () => {
+    const isFullscreen = Boolean(document.fullscreenElement);
+    fullscreenButton.textContent = isFullscreen ? "⤢" : "⛶";
+    fullscreenButton.title = isFullscreen ? "Exit Fullscreen" : "Toggle Fullscreen";
+    fullscreenButton.setAttribute(
+      "aria-label",
+      isFullscreen ? "Exit fullscreen" : "Toggle fullscreen"
+    );
   });
 }
 

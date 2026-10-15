@@ -855,7 +855,7 @@ input[type="range"] {
   letter-spacing: .14em;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 520px) and (orientation: landscape) {
   body {
     padding: 8px;
     align-items: start;
@@ -1049,5 +1049,555 @@ input[type="range"] {
   #fireGunButton {
     width: 64px;
     height: 64px;
+  }
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.icon-button,
+.action-button,
+.fire-button,
+.gun-button,
+.dpad button,
+.primary-button,
+.shop-item {
+  transition: transform .16s ease, border-color .16s ease, filter .16s ease;
+}
+
+.icon-button:hover,
+.shop-item:hover {
+  border-color: var(--gold);
+  filter: brightness(1.15);
+}
+
+.icon-button:active,
+.action-button:active,
+.fire-button:active,
+.gun-button:active,
+.dpad button:active,
+.primary-button:active,
+.shop-item:active {
+  transform: scale(.95);
+}
+
+.eyebrow .live-dot {
+  animation: livePulse 1.8s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  50% {
+    opacity: .45;
+    box-shadow: 0 0 4px var(--gold);
+  }
+}
+
+.touch-hint {
+  display: none;
+}
+
+.zone-status {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 11;
+  padding: 8px 11px;
+  border: 1px solid #4cc9f077;
+  border-radius: 7px;
+  background: #101820dc;
+  color: var(--blue);
+  font: 800 11px "Barlow Condensed", sans-serif;
+  letter-spacing: .1em;
+  text-shadow: 0 1px 8px #000;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
+
+.zone-status.danger {
+  border-color: #ff5a5a99;
+  background: #3b1515dc;
+  color: #ff7777;
+  animation: zonePulse .8s ease-in-out infinite alternate;
+}
+
+@keyframes zonePulse {
+  to {
+    box-shadow: 0 0 16px #ff5a5a77;
+  }
+}
+
+.shop-card,
+.leaderboard-card,
+.settings-card {
+  max-height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.game-shell:fullscreen {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
+    max(6px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  background: #0d1117;
+}
+
+.game-shell:fullscreen .arena {
+  min-height: 0;
+  height: 100%;
+}
+
+.game-shell:fullscreen #gameCanvas {
+  height: 100%;
+  min-height: 0;
+}
+
+@media (max-width: 700px), (max-height: 520px) and (orientation: landscape) {
+  body {
+    display: block;
+    min-height: 100svh;
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    overflow-x: hidden;
+  }
+
+  .game-shell {
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding-bottom: 9px;
+  }
+
+  .brand {
+    grid-column: 1;
+    grid-row: 1;
+    gap: 7px;
+    font-size: 16px;
+  }
+
+  .brand-mark {
+    width: 30px;
+    height: 30px;
+  }
+
+  .topbar-buttons {
+    grid-column: 2;
+    grid-row: 1;
+    gap: 4px;
+  }
+
+  .topbar-buttons .icon-button {
+    width: clamp(30px, 8vw, 36px);
+    height: clamp(30px, 8vw, 36px);
+    font-size: 14px;
+  }
+
+  .match-info {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .match-info .stat {
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid #ffffff14;
+    border-radius: 7px;
+    background: #151b23b8;
+  }
+
+  .stat-label {
+    font-size: 8px;
+  }
+
+  .stat strong {
+    font-size: 17px;
+  }
+
+  .arena {
+    border-radius: 12px;
+  }
+
+  #gameCanvas {
+    height: clamp(420px, calc(100svh - 180px), 780px);
+    min-height: 0;
+  }
+
+  .game-overlay {
+    padding: 16px;
+  }
+
+  .intro-card {
+    width: min(440px, 100%);
+  }
+
+  .intro-card h1 {
+    font-size: clamp(52px, 15vw, 78px);
+  }
+
+  .intro-card p {
+    margin: 10px 0 15px;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .control-hint {
+    display: none;
+  }
+
+  .touch-hint {
+    display: block;
+    margin-top: 13px;
+    color: #c3ccd6;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .1em;
+  }
+
+  .primary-button {
+    min-height: 46px;
+  }
+
+  .combat-hud {
+    left: 6px;
+    right: 6px;
+    bottom: max(5px, env(safe-area-inset-bottom));
+    gap: 5px;
+  }
+
+  .health-panel,
+  .weapon-panel {
+    padding: 6px 8px;
+    min-width: 0;
+  }
+
+  .health-panel {
+    width: 48%;
+  }
+
+  .weapon-panel {
+    width: 52%;
+    gap: 6px;
+  }
+
+  .health-heading {
+    font-size: 8px;
+  }
+
+  .health-heading strong {
+    font-size: 14px;
+  }
+
+  .weapon-icon {
+    font-size: 18px;
+  }
+
+  .weapon-info {
+    min-width: 0;
+  }
+
+  .weapon-info strong {
+    font-size: 12px;
+  }
+
+  .weapon-info span {
+    display: block;
+    max-width: 110px;
+    overflow: hidden;
+    font-size: 7px;
+    white-space: nowrap;
+  }
+
+  .ammo strong {
+    font-size: 18px;
+  }
+
+  .ammo span {
+    font-size: 8px;
+  }
+
+  .bottom-stats {
+    gap: 4px;
+    font-size: 6px;
+  }
+
+  .mobile-controls {
+    bottom: calc(82px + env(safe-area-inset-bottom));
+    padding: 0 10px;
+  }
+
+  .dpad {
+    grid-template: repeat(2, clamp(42px, 12vw, 50px)) / repeat(3, clamp(42px, 12vw, 50px));
+    gap: 4px;
+  }
+
+  .dpad button {
+    border-color: #dce9f077;
+    border-radius: 14px;
+    background: linear-gradient(145deg, #273744e8, #101820e8);
+    box-shadow: 0 4px 12px #0008, inset 0 1px #ffffff18;
+    font-size: 16px;
+  }
+
+  .mobile-actions {
+    grid-template: repeat(4, 42px) / 58px 66px;
+    gap: 4px;
+  }
+
+  .action-button,
+  .fire-button,
+  .gun-button {
+    border-color: #dce9f077;
+    background: linear-gradient(145deg, #273744e8, #101820e8);
+    box-shadow: 0 4px 12px #0008, inset 0 1px #ffffff18;
+    font-size: 10px;
+  }
+
+  .fire-button {
+    width: 68px;
+    height: 68px;
+    border: 2px solid var(--gold);
+    background: linear-gradient(145deg, #ffcc4ddd, #b45309e8);
+    color: #171006;
+    font-size: 12px;
+    font-weight: 900;
+    box-shadow: 0 0 18px #ffcc4d55, 0 4px 12px #0008;
+  }
+
+  #fireGunButton {
+    width: 60px;
+    height: 60px;
+  }
+
+  .zone-status {
+    top: 9px;
+    right: 8px;
+    padding: 6px 8px;
+    font-size: 9px;
+  }
+
+  .boss-bar {
+    top: 10px;
+    left: 8px;
+    width: 42%;
+    transform: none;
+  }
+
+  .boss-bar span {
+    font-size: 10px;
+  }
+
+  .boss-track {
+    margin-top: 3px;
+  }
+
+  .action-message {
+    top: 28%;
+    width: 90%;
+    text-align: center;
+    font-size: 16px;
+  }
+
+  .reel-button {
+    top: 46px;
+    right: 8px;
+    padding: 8px 10px;
+  }
+
+  .footer {
+    padding-top: 8px;
+    font-size: 8px;
+  }
+
+  .shop-overlay,
+  .settings-overlay,
+  .leaderboard-overlay {
+    padding: 10px;
+  }
+
+  .shop-card,
+  .settings-card,
+  .leaderboard-card {
+    max-height: 100%;
+    padding: 14px;
+  }
+}
+
+@media (max-width: 380px) {
+  .topbar-buttons {
+    gap: 3px;
+  }
+
+  .topbar-buttons .icon-button {
+    width: 29px;
+    height: 29px;
+    font-size: 12px;
+  }
+
+  .match-info .stat {
+    padding: 5px 6px;
+  }
+
+  .stat-label {
+    font-size: 7px;
+  }
+
+  .mobile-controls {
+    padding: 0 7px;
+  }
+
+  .mobile-actions {
+    grid-template-columns: 54px 60px;
+  }
+
+  .fire-button {
+    width: 62px;
+    height: 62px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  body {
+    padding: 4px max(6px, env(safe-area-inset-right)) 4px max(6px, env(safe-area-inset-left));
+  }
+
+  .topbar {
+    display: flex;
+    gap: 8px;
+    padding-bottom: 5px;
+  }
+
+  .brand {
+    gap: 5px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .brand-mark {
+    width: 27px;
+    height: 27px;
+  }
+
+  .match-info {
+    display: flex;
+    gap: clamp(6px, 2vw, 16px);
+  }
+
+  .match-info .stat {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .stat-label {
+    font-size: 7px;
+  }
+
+  .stat strong {
+    font-size: 14px;
+  }
+
+  .topbar-buttons {
+    gap: 3px;
+  }
+
+  .topbar-buttons .icon-button {
+    width: 29px;
+    height: 29px;
+    font-size: 12px;
+  }
+
+  #gameCanvas {
+    height: clamp(270px, calc(100svh - 95px), 440px);
+  }
+
+  .mobile-controls {
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    padding: 0 8px;
+  }
+
+  .dpad {
+    grid-template: repeat(2, 40px) / repeat(3, 40px);
+    gap: 3px;
+  }
+
+  .mobile-actions {
+    grid-template: repeat(4, 35px) / 50px 54px;
+    gap: 3px;
+  }
+
+  .fire-button {
+    width: 55px;
+    height: 55px;
+    font-size: 10px;
+  }
+
+  #fireGunButton {
+    width: 48px;
+    height: 48px;
+  }
+
+  .combat-hud {
+    bottom: max(3px, env(safe-area-inset-bottom));
+  }
+
+  .footer {
+    display: none;
+  }
+
+  .game-overlay {
+    padding: 8px;
+  }
+
+  .intro-card {
+    width: min(390px, 44%);
+  }
+
+  .intro-card h1 {
+    margin: 7px 0;
+    font-size: clamp(34px, 7vw, 58px);
+  }
+
+  .intro-card p {
+    margin: 8px 0 12px;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .intro-card .primary-button {
+    width: min(190px, 100%);
+    min-width: 0;
+    height: 42px;
+  }
+
+  .touch-hint {
+    margin-top: 8px;
+    font-size: 7px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
   }
 }

@@ -8,7 +8,12 @@ const renderer = new THREE.WebGLRenderer({
   powerPreference: "high-performance"
 });
 
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(
+  Math.min(
+    window.devicePixelRatio,
+    window.matchMedia("(max-width: 700px)").matches ? 1.5 : 2
+  )
+);
 renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
 
 const scene = new THREE.Scene();
@@ -29,16 +34,17 @@ const mainLight = new THREE.DirectionalLight(0xffffff, 1.1);
 mainLight.position.set(120, 220, 120);
 scene.add(mainLight);
 
-const groundGeometry = new THREE.PlaneGeometry(2400, 1800);
+const groundGeometry = new THREE.PlaneGeometry(4000, 3000);
 const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x1d2b36 });
 
 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
 ground.rotation.x = -Math.PI / 2;
-ground.position.set(1200, 0, 900);
+ground.position.set(2000, 0, 1500);
 scene.add(ground);
 
-const gridHelper = new THREE.GridHelper(2400, 40, 0x2b3a47, 0x22303c);
-gridHelper.position.set(1200, 0, 900);
+const gridHelper = new THREE.GridHelper(4000, 40, 0x2b3a47, 0x22303c);
+gridHelper.scale.z = .75;
+gridHelper.position.set(2000, 0, 1500);
 scene.add(gridHelper);
 
 const treeGeometry = new THREE.ConeGeometry(18, 45, 7);
@@ -51,9 +57,9 @@ for (let i = 0; i < 45; i++) {
   const tree = new THREE.Mesh(treeGeometry, treeMaterial);
 
   tree.position.set(
-    Math.random() * 2200 + 100,
+    Math.random() * 3800 + 100,
     22,
-    Math.random() * 1600 + 100
+    Math.random() * 2800 + 100
   );
 
   tree.scale.setScalar(.8 + Math.random() * .8);
@@ -64,9 +70,9 @@ for (let i = 0; i < 25; i++) {
   const rock = new THREE.Mesh(rockGeometry, rockMaterial);
 
   rock.position.set(
-    Math.random() * 2200 + 100,
+    Math.random() * 3800 + 100,
     8,
-    Math.random() * 1600 + 100
+    Math.random() * 2800 + 100
   );
 
   rock.rotation.set(
@@ -85,7 +91,7 @@ const arenaRing = new THREE.Mesh(
 );
 
 arenaRing.rotation.x = Math.PI / 2;
-arenaRing.position.set(1200, 2, 900);
+arenaRing.position.set(2000, 2, 1500);
 scene.add(arenaRing);
 
 const bossPlatform = new THREE.Mesh(
@@ -93,7 +99,7 @@ const bossPlatform = new THREE.Mesh(
   new THREE.MeshLambertMaterial({ color: 0x2b3a47 })
 );
 
-bossPlatform.position.set(1200, 3, 900);
+bossPlatform.position.set(2000, 3, 1500);
 scene.add(bossPlatform);
 
 function createFighter(color) {
@@ -202,7 +208,7 @@ const smokeMaterial = new THREE.MeshLambertMaterial({ color: 0x9aa7b4 });
 const grenade3DList = new Map();
 
 const zoneRing = new THREE.Mesh(
-  new THREE.TorusGeometry(1, 6, 8, 64),
+  new THREE.TorusGeometry(1, .004, 8, 64),
   new THREE.MeshBasicMaterial({ color: 0x4cc9f0 })
 );
 
@@ -583,11 +589,28 @@ window.setPlayerSkin = function (color) {
   });
 };
 
-window.addEventListener("resize", () => {
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
+function resizeRenderer() {
+  const width = Math.round(canvas.clientWidth);
+  const height = Math.round(canvas.clientHeight);
 
+  if (!width || !height) return;
+
+  renderer.setPixelRatio(
+    Math.min(
+      window.devicePixelRatio,
+      window.matchMedia("(max-width: 700px)").matches ? 1.5 : 2
+    )
+  );
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height, false);
-});
+}
+
+if ("ResizeObserver" in window) {
+  const resizeObserver = new ResizeObserver(resizeRenderer);
+  resizeObserver.observe(canvas);
+} else {
+  window.addEventListener("resize", resizeRenderer);
+}
+
+window.addEventListener("orientationchange", resizeRenderer);

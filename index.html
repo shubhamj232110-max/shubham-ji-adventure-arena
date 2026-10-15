@@ -52,6 +52,7 @@
         <button id="leaderboardButton" class="icon-button" title="Leaderboard">🏆</button>
         <button id="settingsButton" class="icon-button" title="Settings">⚙️</button>
         <button id="soundBtn" class="icon-button" title="Sound">♪</button>
+        <button id="fullscreenButton" class="icon-button" title="Toggle Fullscreen" aria-label="Toggle fullscreen">⛶</button>
       </div>
     </header>
 
@@ -67,8 +68,8 @@
           <h1>SHUBHAM<br /><span>JI</span></h1>
 
           <p>
-            Enemies ko harao, coins collect karo, pet ko upgrade karo,
-            power-ups lo aur boss ko defeat karo.
+            Enemies ko harao, supply crates se guns lo aur safe zone ke
+            andar survive karo. Coins, pets, power-ups aur boss battles tumhara wait kar rahe hain.
           </p>
 
           <button id="startBtn" class="primary-button">
@@ -88,6 +89,7 @@
             <kbd>ARROWS</kbd> P2 Move
             <kbd>1-8</kbd> P2 Actions
           </div>
+          <div class="touch-hint">PHONE: LEFT SIDE MOVE · HOLD FIRE TO AUTO-SHOOT</div>
         </div>
       </div>
 
@@ -200,6 +202,8 @@
           <div id="bossHealth" class="boss-fill"></div>
         </div>
       </div>
+
+      <div class="zone-status" id="zoneStatus" aria-live="polite">SAFE ZONE · WAITING</div>
 
       <div class="action-message" id="actionMessage"></div>
 
